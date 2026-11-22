@@ -176,3 +176,14 @@ details.country .regions{padding:0 14px 12px}
 
 .warnbox.pend{background:#fff1ea;border-color:#f0b49b}
 .pendtag{color:var(--coral-d);font-weight:700}
+
+.lead{font-size:16px;color:var(--muted)}
+.ans{display:flex;gap:10px;align-items:flex-start;margin:8px 0}
+.ans .tag{flex:none;min-width:22px;text-align:center}
+.ex{display:flex;gap:10px;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line)}
+.ex:last-child{border-bottom:0}.ex span:nth-child(2){color:var(--muted);flex:1;text-align:right}.ex b{white-space:nowrap}
+.ex.tot b{color:var(--teal-d)}
+.tl{margin:6px 0 0;padding-left:18px}.tl li{margin:4px 0}
+.linkcard a{margin-right:16px;font-weight:700}
+a.linkcard.big{display:block;text-decoration:none;color:inherit}a.linkcard.big b{display:block;color:var(--teal-d)}
+.prose .card>b{display:block;margin-bottom:4px}
