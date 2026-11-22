@@ -87,7 +87,7 @@ const Cloud = {
     if (k === "reviews") S.reviews.filter(r => r.user === me).forEach(r => put("review", r.spring + "|" + me, r.spring, r));
     if (k === "photos") S.photos.filter(p => p.user === me && !String(p.data).startsWith("data:")).forEach(p => put("photo", p.id, p.spring, p));
     if (k === "edits") S.edits.forEach(e => {
-      if (e.user === me) put("edit", e.id, e.spring, Object.assign({}, e, { confirm: [] }));
+      if (e.user === me) { const d = Object.assign({}, e, { confirm: [] }); delete d.verdict; put("edit", e.id, e.spring, d); }
       if ((e.confirm || []).includes(me) && e.user !== me) put("confirm", e.id + "|" + me, e.spring, { edit: e.id });
     });
     if (k === "listings") S.listings.filter(l => l.user === me).forEach(l => put("listing", l.id, l.spring, l));
@@ -123,21 +123,22 @@ const Cloud = {
       const r = await this.call("/rest/v1/items?select=kind,id,spring,user_id,doc&order=created_at.asc&limit=1000&offset=" + off);
       const part = await r.json(); rows.push(...part); if (part.length < 1000) break;
     }
-    const n = { reviews: [], photos: [], edits: [], listings: [], cats: [], added: [], lists: { been: [], want: [] } }, conf = {};
+    const n = { reviews: [], photos: [], edits: [], listings: [], cats: [], added: [], lists: { been: [], want: [] } }, conf = {}, verd = {};
     this.mine = {};
     rows.forEach(x => {
       if (x.user_id === me) this.mine[x.kind + "/" + x.id] = JSON.stringify(x.doc);
-      const d = Object.assign({}, x.doc, x.kind === "confirm" || x.kind === "list" ? {} : { user: x.user_id });
+      const d = Object.assign({}, x.doc, x.kind === "confirm" || x.kind === "list" || x.kind === "verdict" ? {} : { user: x.user_id });
       if (x.kind === "review") n.reviews.push(d);
       else if (x.kind === "photo") n.photos.push(d);
       else if (x.kind === "edit") n.edits.push(d);
+      else if (x.kind === "verdict") verd[x.doc.edit] = x.doc;
       else if (x.kind === "confirm") (conf[x.doc.edit] = conf[x.doc.edit] || []).push(x.user_id);
       else if (x.kind === "listing") n.listings.push(d);
       else if (x.kind === "cat") n.cats.push(d);
       else if (x.kind === "added") n.added.push(d);
       else if (x.kind === "list" && x.user_id === me) (n.lists[x.doc.kind] || []).push(x.doc.spring);
     });
-    n.edits.forEach(e => e.confirm = conf[e.id] || []);
+    n.edits.forEach(e => { e.confirm = conf[e.id] || []; if (verd[e.id]) e.verdict = verd[e.id]; });
     SHARED.forEach(k => S[k] = n[k]);
   },
   async init() {
@@ -179,12 +180,16 @@ function tempClass(t) { if (t == null) return ""; if (t < 20) return "Cold"; if 
 const stars = n => "★".repeat(Math.round(n)) + "☆".repeat(5 - Math.round(n));
 
 /* ---------- data model ---------- */
+const isApprox = s => !s.posConfirmed && String(s.src || "").startsWith("Editorial");
+const LOC_HOW = { gps: "I stood there and used GPS", sat: "I can see it on satellite imagery", local: "Local knowledge (I live nearby or visited)", sign: "An official sign, website or map" };
 function applyEdits(s) {
   const o = Object.assign({}, s);
-  const mine = S.edits.filter(e => e.spring === s.id && !e.rejected);
+  const mine = S.edits.filter(e => e.spring === s.id && !e.rejected && !(e.verdict && e.verdict.verdict === "rejected"));
   const best = {};
-  mine.forEach(e => { const v = 1 + (e.confirm || []).length; if (v >= CONFIG.confirmThreshold && (!best[e.field] || v >= best[e.field].v)) best[e.field] = { v, e }; });
+  mine.forEach(e => { if (e.field === "position") { if (e.verdict && e.verdict.verdict === "verified") { try { const p = JSON.parse(e.value); if (!best.position || e.date > best.position.e.date) best.position = { v: 9, e, p }; } catch (x) { } } return; }
+    const v = 1 + (e.confirm || []).length; if (v >= CONFIG.confirmThreshold && (!best[e.field] || v >= best[e.field].v)) best[e.field] = { v, e }; });
   Object.keys(best).forEach(f => {
+    if (f === "position") { o.lat = best.position.p.lat; o.lon = best.position.p.lon; o.posConfirmed = true; return; }
     const val = best[f].e.value;
     if (f === "temp_c") o.temp_c = Number(val);
     else if (f === "name") o.name = val;
@@ -246,7 +251,7 @@ function initMap() {
 function popupHtml(s) {
   const c = catOf(s.cat), r = rating(s.id);
   return `<div class="pop"><b>${esc(s.name)}</b><small>${esc([s.region, s.country].filter(Boolean).join(", "))}</small><br>
-    <span class="chip"><i style="background:${c.color}"></i>${esc(c.name)}</span>${r ? ` <span class="stars">${stars(r.overall)}</span>` : ""}<br>
+    <span class="chip"><i style="background:${c.color}"></i>${esc(c.name)}</span>${r ? ` <span class="stars">${stars(r.overall)}</span>` : ""}<br>${isApprox(s) ? `<span class="tag warn">Approximate position</span><br>` : ""}
     <button class="btn sm" data-open="${esc(s.id)}">Open</button></div>`;
 }
 function refreshMarkers() {
@@ -254,7 +259,8 @@ function refreshMarkers() {
   const ms = [];
   S.springs.forEach(s => {
     if (!passes(s)) return;
-    const m = L.circleMarker([s.lat, s.lon], { radius: 7, weight: 2, color: "#fff", fillColor: catOf(s.cat).color, fillOpacity: .95 });
+    const ap = isApprox(s);
+    const m = L.circleMarker([s.lat, s.lon], ap ? { radius: 10, weight: 2, color: "#d97706", dashArray: "3 3", fillColor: catOf(s.cat).color, fillOpacity: .35 } : { radius: 7, weight: 2, color: "#fff", fillColor: catOf(s.cat).color, fillOpacity: .95 });
     m.bindPopup(() => popupHtml(s));
     m.on("click", () => { /* popup opens */ });
     ms.push(m);
@@ -281,7 +287,7 @@ function renderList() {
 function itemHtml(s) {
   const c = catOf(s.cat), r = rating(s.id);
   return `<div class="item" data-open="${esc(s.id)}"><span class="dot" style="background:${c.color}"></span>
-    <div><b>${esc(s.name)}</b><small>${esc([s.region, s.country].filter(Boolean).join(", "))}${s.temp_c != null ? " · " + s.temp_c + "°C" : ""} · ${esc(c.name)}</small></div>
+    <div><b>${esc(s.name)}</b><small>${esc([s.region, s.country].filter(Boolean).join(", "))}${s.temp_c != null ? " · " + s.temp_c + "°C" : ""} · ${esc(c.name)}${isApprox(s) ? " · <span class=\"warntxt\">approximate position</span>" : ""}</small></div>
     <span class="score">${r ? r.overall.toFixed(1) + " ★" : ""}</span></div>`;
 }
 function locate() {
@@ -336,13 +342,14 @@ function openSpring(id, push = true) {
     ["Water", s.temp_c != null ? `${s.temp_c}°C · ${tempClass(s.temp_c)}` : "Not recorded"],
     ["Height", s.elev != null ? s.elev + " m" : "Not recorded"],
     ["Where", [s.region, s.country].filter(Boolean).join(", ") || "Unknown"],
-    ["Position", s.lat.toFixed(4) + ", " + s.lon.toFixed(4)]
+    ["Position", s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + (isApprox(s) ? " (approximate)" : s.posConfirmed ? " (confirmed)" : "")]
   ];
   const html = `
     <h2 style="margin-bottom:4px">${esc(s.name)}</h2>${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
     <div class="row"><span class="chip"><i style="background:${c.color}"></i>${esc(c.name)}</span>
       ${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
     <p class="muted" style="margin:6px 0">${esc(c.line)}</p>
+    ${isApprox(s) ? `<div class="warnbox"><b>Approximate position.</b> This pin marks the nearest town, not the spring itself. Ask locally or check before you travel. Know the exact spot? <button class="btn sm" data-act="locate">Update location</button></div>` : ""}
     <div class="row">
       <button class="btn sm ${been ? "on" : "ghost"}" data-list="been">${been ? "✓ Been here" : "I have been here"}</button>
       <button class="btn sm ${want ? "on" : "ghost"}" data-list="want">${want ? "✓ Want to go" : "I want to go"}</button>
@@ -365,10 +372,10 @@ function openSpring(id, push = true) {
     <div class="row">${CATS.map(k => `<button class="chip btn" data-vote="${k.id}"><i style="background:${k.color}"></i>${esc(k.name)}</button>`).join("")}</div>
     <h3 style="margin-top:18px">Check the details</h3>
     <p class="muted">Correct anything that is wrong. A suggestion shows once another visitor confirms it${CONFIG.confirmThreshold < 2 ? " (test build: shows straight away)" : ""}.</p>
-    ${eds.map(e => `<div class="card"><b>${esc(({ name: "Name", temp_c: "Temperature °C", access: "Getting there", cost: "Cost", closed: "Closed or gone" })[e.field] || e.field)}:</b> ${esc(e.value)}<br>
+    ${eds.map(e => e.field === "position" ? posCard(e) : `<div class="card"><b>${esc(({ name: "Name", temp_c: "Temperature °C", access: "Getting there", cost: "Cost", closed: "Closed or gone" })[e.field] || e.field)}:</b> ${esc(e.value)}<br>
       <small class="muted">Suggested by ${esc(e.handle)} · ${1 + (e.confirm || []).length} confirm${(e.confirm || []).length ? "s" : ""}</small>
       ${e.user !== me.id && !(e.confirm || []).includes(me.id) ? ` <button class="btn sm ghost" data-confirm="${esc(e.id)}">Confirm</button>` : ""}</div>`).join("")}
-    <button class="btn ghost sm" data-act="correct">Suggest a correction</button>
+    <button class="btn ghost sm" data-act="correct">Suggest a correction</button> <button class="btn ghost sm" data-act="locate">Update location</button>
     <h3 style="margin-top:18px">Local listings</h3>
     ${lst.length ? lst.map(l => `<div class="card"><b>${esc(l.name)}</b> <span class="tag">${l.plan === "advert" ? "Advert" : "Free listing"}</span><br>${esc(l.text)}${l.web ? `<br><a href="${esc(l.web)}" rel="noopener nofollow" target="_blank">${esc(l.web)}</a>` : ""}</div>`).join("") : `<p class="muted">No business listed here yet.</p>`}
     <button class="btn ghost sm" data-act="list">Run this spring? Add a free listing</button>`;
@@ -381,6 +388,7 @@ function openSpring(id, push = true) {
       else if (t.dataset.act === "review") openReview(id);
       else if (t.dataset.act === "photo") openPhoto(id);
       else if (t.dataset.act === "correct") openCorrect(id);
+      else if (t.dataset.act === "locate") openLocate(id);
       else if (t.dataset.act === "list") openListing(id);
       else if (t.dataset.vote) { vote(id, Number(t.dataset.vote)); }
       else if (t.dataset.confirm) { confirmEdit(t.dataset.confirm, id); }
@@ -481,6 +489,41 @@ function openCorrect(id) {
       if (field === "temp_c" && (isNaN(Number(value)) || Number(value) < -5 || Number(value) > 120)) return toast("Enter a temperature in °C");
       S.edits.push({ id: uid(), spring: id, field, value, user: me.id, handle: me.handle, confirm: [], date: new Date().toISOString() });
       save("edits"); rebuild(); refreshMarkers(); toast("Thanks, correction sent"); openSpring(id, false);
+    };
+  });
+}
+function posCard(e) {
+  let p = {}; try { p = JSON.parse(e.value); } catch (x) { }
+  const v = e.verdict ? e.verdict.verdict : "pending";
+  const status = v === "verified" ? `<span class="tag ok">Checked and applied</span>` : v === "rejected" ? `<span class="tag warn">Not accepted</span>` : `<span class="tag">Awaiting check</span>`;
+  return `<div class="card"><b>New location:</b> ${esc(Number(p.lat).toFixed(5))}, ${esc(Number(p.lon).toFixed(5))} ${status}<br>
+    <small class="muted">Suggested by ${esc(e.handle)} · ${esc(LOC_HOW[p.how] || "")}${e.verdict && e.verdict.note ? " · " + esc(e.verdict.note) : ""}</small></div>`;
+}
+const LOC_LIMIT = { approx: 40, record: 3 };   // furthest a new position may be from the current pin (km)
+function openLocate(id, pre) {
+  const s = S.byId.get(id), me = profile(); const base = S.springs_base.find(b => b.id === id) || s;
+  const lat0 = pre ? pre.lat : s.lat, lon0 = pre ? pre.lon : s.lon;
+  openSheet("Update location: " + s.name, `
+    <p class="muted">${isApprox(s) ? "The pin is only the nearest town." : "Move the pin to where the spring really is."} Pins move only after a check, so nobody is sent to the wrong place.</p>
+    <div class="row"><button class="btn sm" id="lPick">Pick on the map</button><button class="btn sm ghost" id="lGps">Use my location now</button></div>
+    <div class="row"><label class="field" style="flex:1"><span>Latitude</span><input id="lLat" inputmode="decimal" value="${Number(lat0).toFixed(5)}"></label>
+    <label class="field" style="flex:1"><span>Longitude</span><input id="lLon" inputmode="decimal" value="${Number(lon0).toFixed(5)}"></label></div>
+    <label class="field"><span>How do you know?</span><select id="lHow">${Object.entries(LOC_HOW).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></label>
+    <div class="row"><button class="btn" id="lSend">Send for checking</button><button class="btn ghost" id="lBack">Back</button></div>`, sh => {
+    $("#lBack", sh).onclick = () => openSpring(id, false);
+    $("#lGps", sh).onclick = () => navigator.geolocation ? navigator.geolocation.getCurrentPosition(p => { $("#lLat").value = p.coords.latitude.toFixed(5); $("#lLon").value = p.coords.longitude.toFixed(5); $("#lHow").value = "gps"; }, () => toast("Could not get your location")) : toast("Location is not available here");
+    $("#lPick", sh).onclick = () => {
+      closeSheet(); setView("map"); flyTo(s, 15); if (S.layer !== "sat") $("#btnLayer").click();
+      toast("Tap the exact spot on the map"); S.map.once("click", ev => openLocate(id, { lat: ev.latlng.lat, lon: ev.latlng.lng }));
+    };
+    $("#lSend", sh).onclick = () => {
+      const lat = parseFloat($("#lLat", sh).value), lon = parseFloat($("#lLon", sh).value);
+      if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return toast("Enter a valid position");
+      const d = km({ lat: s.lat, lon: s.lon }, { lat, lon }), lim = isApprox(s) ? LOC_LIMIT.approx : LOC_LIMIT.record;
+      if (d < 0.02) return toast("That is the same place as now");
+      if (d > lim) return toast("That is " + Math.round(d) + " km from the current pin. Further than " + lim + " km needs a new spring entry instead.");
+      S.edits.push({ id: uid(), spring: id, field: "position", value: JSON.stringify({ lat: +lat.toFixed(5), lon: +lon.toFixed(5), how: $("#lHow", sh).value }), user: me.id, handle: me.handle, confirm: [], date: new Date().toISOString() });
+      save("edits"); rebuild(); refreshMarkers(); toast("Thanks. The new location is awaiting a check."); openSpring(id, false);
     };
   });
 }

@@ -116,3 +116,8 @@ details.country .regions{padding:0 14px 12px}
   .crit{grid-template-columns:100px 1fr 36px}
 }
 .badge[hidden]{display:none}
+
+.tag.warn{background:#fff4e0;color:#b45309;border-color:#f3c98b}
+.tag.ok{background:#e6f6ee;color:#0f7a4a;border-color:#a8dcc3}
+.warntxt{color:#b45309;font-weight:600}
+.warnbox{background:#fff8ec;border:1px solid #f3c98b;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:14px}
