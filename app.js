@@ -539,7 +539,7 @@ function openSpring(id, push = true) {
       <button class="btn sm ghost" data-act="share">Share</button>
       <button class="btn sm ghost" data-act="show">Map</button>
     </div>
-    ${note ? `<div class="writer"><b>From the writer</b><br>${esc(note.text)}</div>` : ""}
+    ${note ? `<div class="writer"><b>Editor's note</b><br>${esc(note.text)}</div>` : ""}
     <div class="facts">${facts.map(f => `<div class="fact"><small>${f[0]}</small><b>${esc(f[1])}</b></div>`).join("")}</div>
     ${s.accessNote ? `<p><b>Getting there:</b> ${esc(s.accessNote)}</p>` : ""}${s.costNote ? `<p><b>Cost:</b> ${esc(s.costNote)}</p>` : ""}
     <h3>Photos (${phs.length})</h3>
@@ -765,11 +765,11 @@ function openLocate(id, pre) {
 function openListing(id) {
   const s = S.byId.get(id), me = profile();
   openSheet("List your business at " + s.name, `
-    <p>Every spring can carry a free basic listing for the place that looks after it. Adverts, with a photo and a link, are available for a small monthly fee announced at launch. Nothing is charged in this test build.</p>
+    <p>Every spring can carry a free basic listing for the place that looks after it. Featured adverts, with a photo and a link, cost £19 a month or £190 a year. Nothing is charged in this test build.</p>
     <label class="field"><span>Business name</span><input id="lName" maxlength="80"></label>
     <label class="field"><span>Website (optional)</span><input id="lWeb" type="url" placeholder="https://"></label>
     <label class="field"><span>What you offer (opening hours, entry price, facilities)</span><textarea id="lText" maxlength="400"></textarea></label>
-    <label class="field"><span>Plan</span><select id="lPlan"><option value="free">Free basic listing</option><option value="advert">Advert (small monthly fee, announced at launch)</option></select></label>
+    <label class="field"><span>Plan</span><select id="lPlan"><option value="free">Free basic listing</option><option value="advert">Featured advert (£19 a month, £190 a year)</option></select></label>
     <div class="row"><button class="btn" id="lSave">Submit listing</button><button class="btn ghost" id="lBack">Back</button></div>`, sh => {
     $("#lBack", sh).onclick = () => openSpring(id, false);
     $("#lSave", sh).onclick = () => {
@@ -858,7 +858,7 @@ function renderAbout() {
     <p class="lead" style="font-weight:600;color:var(--coral-d)">Hot springs, scored by people who got in.</p>
     <p class="lead">A free, growing reference to the natural thermal springs of the world: hot or cold, wild in the hills, at a hotel, or behind a ticket desk. Treated spa water and swimming pools are not on the map.</p>
     <div class="card"><b>Photos</b>Add holiday snaps for everyone to see. Professional-style pictures can also go in the planned book.</div>
-    <div class="card"><b>Businesses</b>Add a free basic listing from a spring's page. Adverts cost a small monthly fee, announced at launch.</div>
+    <div class="card"><b>Businesses</b>Add a free basic listing from a spring's page. Featured adverts cost £19 a month or £190 a year.</div>
     <div class="card"><b>Where the data comes from</b>Open public-domain and CC0 sources (Wikidata, the NOAA thermal springs list) plus a small editorial set where those are thin, such as Colombia. Visitors confirm, correct and extend it. Map tiles by Esri.</div>
     <div class="catlist">
       <a class="card linkcard big" href="#how" data-nav="how"><b>How scoring works</b><span class="muted">The four questions, the score and the type scale</span></a>
@@ -924,7 +924,7 @@ function renderTerms() {
     ["What you post", ["Ratings, words, corrections, listings and photos are public.", "You keep ownership and let the site show them.", "Abusive, false, spam or unlawful content can be removed."]],
     ["Photos", ["Add only photos you took yourself.", "A photo shows on its spring page.", "Tick the professional-style option and it may also appear in the planned Thermal Waters of the World book.", "You can remove your own photos."]],
     ["Accounts and your data", ["You pick a handle; only the handle is shown.", "An email is used only to send your sign-in link, so your lists follow you to another device.", "Data is stored in the site's shared database.", "On My springs you can erase your account, lists, ratings and photos."]],
-    ["Businesses and adverts", ["A basic listing is free.", "Adverts will cost a small monthly fee, announced at launch."]],
+    ["Businesses and adverts", ["A basic listing is free.", "A featured advert costs £19 a month or £190 a year."]],
     ["Sources", ["Open public-domain and CC0 data: Wikidata, the NOAA thermal springs list, a small editorial set.", "Map tiles by Esri."]]];
   $("#terms").innerHTML = `
     <h1 style="font-family:Fraunces,Georgia,serif;font-weight:600;color:var(--teal-d)">Terms of use</h1>
@@ -997,7 +997,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121x").then(r => r.json()), fetch("data/notes.json?v=20261121x").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261122a").then(r => r.json()), fetch("data/notes.json?v=20261122a").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
