@@ -188,3 +188,5 @@ details.country .regions{padding:0 14px 12px}
 a.linkcard.big{display:block;text-decoration:none;color:inherit}a.linkcard.big b{display:block;color:var(--teal-d)}
 .prose .card>b{display:block;margin-bottom:4px}
 .lnk{background:none;border:0;padding:0 0 0 8px;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer}
+
+.brand .name{display:flex;flex-direction:column;line-height:1.1}.brand .slogan{font:500 11px system-ui,sans-serif;color:var(--muted);letter-spacing:0;margin-top:2px;white-space:normal}@media(max-width:560px){.brand .slogan{display:none}}

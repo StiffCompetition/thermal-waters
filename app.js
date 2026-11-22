@@ -855,6 +855,7 @@ function renderMe() {
 function renderAbout() {
   $("#about").innerHTML = `
     <h1 style="font-family:Fraunces,Georgia,serif;font-weight:600;color:var(--teal-d)">About Thermal Waters of the World</h1>
+    <p class="lead" style="font-weight:600;color:var(--coral-d)">Hot springs, scored by people who got in.</p>
     <p class="lead">A free, growing reference to the natural thermal springs of the world: hot or cold, wild in the hills, at a hotel, or behind a ticket desk. Treated spa water and swimming pools are not on the map.</p>
     <div class="card"><b>Photos</b>Add holiday snaps for everyone to see. Professional-style pictures can also go in the planned book.</div>
     <div class="card"><b>Businesses</b>Add a free basic listing from a spring's page. Adverts cost a small monthly fee, announced at launch.</div>
@@ -996,7 +997,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121w").then(r => r.json()), fetch("data/notes.json?v=20261121w").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121x").then(r => r.json()), fetch("data/notes.json?v=20261121x").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
