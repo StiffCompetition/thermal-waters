@@ -340,7 +340,6 @@ function openSpring(id, push = true) {
   const note = S.notes[id];
   const facts = [
     ["Water", s.temp_c != null ? `${s.temp_c}°C · ${tempClass(s.temp_c)}` : "Not recorded"],
-    ["Height", s.elev != null ? s.elev + " m" : "Not recorded"],
     ["Where", [s.region, s.country].filter(Boolean).join(", ") || "Unknown"],
     ["Position", s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + (isApprox(s) ? " (approximate)" : s.posConfirmed ? " (confirmed)" : "")]
   ];
