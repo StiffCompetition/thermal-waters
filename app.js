@@ -268,13 +268,15 @@ function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = fals
 function km(a, b) { const R = 6371, r = Math.PI / 180, dLa = (b.lat - a.lat) * r, dLo = (b.lon - a.lon) * r;
   const h = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
 function tempClass(t) { if (t == null) return ""; if (t < 20) return "Cold"; if (t < 37) return "Warm"; if (t < 45) return "Hot"; return "Very hot"; }
+const BANDS = [[8, "Unmissable"], [6, "Proper good soak"], [4, "Fine if you're nearby"], [0, "Hard pass"]];
+const verdict = v => v == null ? "" : BANDS.find(b => v >= b[0])[1];
 const scoreOf = id => { const r = rating(id); return r ? r.overall : null; };
 const topKey = o => Object.entries(o || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
 const answerWord = (c, v) => c.opts[Math.max(1, Math.min(3, Math.round(v))) - 1];
 /* the same three measures, in the same order, wherever a spring is listed */
 function metaLine(s) {
   const r = scoreOf(s.id);
-  return [s.temp_c != null ? s.temp_c + "°C " + tempClass(s.temp_c).toLowerCase() : "", catOf(s.cat).name, r ? r.toFixed(1) + "/10" : "not yet rated"].filter(Boolean).join(" · ");
+  return [s.temp_c != null ? s.temp_c + "°C " + tempClass(s.temp_c).toLowerCase() : "", catOf(s.cat).name, r ? r.toFixed(1) + " " + verdict(r) : "not yet rated"].filter(Boolean).join(" · ");
 }
 
 /* ---------- data model ---------- */
@@ -433,7 +435,7 @@ function openFilters() {
   const sel = (id, label, opts, cur) => `<label class="field"><span>${label}</span><select id="${id}"><option value="">Any</option>${opts.map(o => `<option ${cur === o ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
   openSheet("Filters", `
     <div class="field"><span>Type</span><div class="row" id="fcats">${[NOCAT].concat(CATS).map(c => `<button class="chip btn ${S.f.cats.has(c.id) ? "on" : ""}" data-fc="${c.id}"><i style="background:${c.color}"></i>${esc(c.name)}</button>`).join("")}</div></div>
-    <label class="field"><span>Score</span><select id="fRate">${[0, 5, 6, 7, 8, 9].map(n => `<option value="${n}" ${S.f.minRating === n ? "selected" : ""}>${n ? n + " out of 10 and up" : "Any"}</option>`).join("")}</select></label>
+    <label class="field"><span>Score</span><select id="fRate">${[0, 4, 6, 8].map(n => `<option value="${n}" ${S.f.minRating === n ? "selected" : ""}>${n ? esc(verdict(n)) + " (" + n + " and up)" : "Any"}</option>`).join("")}</select></label>
     <label class="field"><span>Water temperature</span><select id="fTemp">${["", ...TEMPS].map(t => `<option value="${t}" ${S.f.temp === t ? "selected" : ""}>${t || "Any"}${t === "Cold" ? " (under 20°C)" : t === "Warm" ? " (20 to 36°C)" : t === "Hot" ? " (37 to 44°C)" : t === "Very hot" ? " (45°C and over)" : ""}</option>`).join("")}</select></label>
     ${sel("fKind", "Water kind", WATER_KIND, S.f.kind)}
     ${sel("fPrice", "Entry price", ["Free", "Paid"], S.f.price)}
@@ -483,7 +485,7 @@ function openSpring(id, push = true) {
       ${hero ? `<img src="${hero.data}" alt="${esc(hero.caption || s.name)}" data-ph="${phs.indexOf(hero)}">` : `<div class="heropanel"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M60 14C60 14 28 50 28 74a32 32 0 0 0 64 0C92 50 60 14 60 14z" fill="#fff" opacity=".35"/><path d="M30 100c10-8 20-8 30 0s20 8 30 0" stroke="#fff" stroke-width="5" fill="none" opacity=".5" stroke-linecap="round"/></svg></div>`}
       <div class="herotag"><b>${esc(c.name)}</b><span>${esc(c.plain)}</span></div>
     </div>
-    <h2 style="margin:12px 0 2px">${esc(s.name)}</h2>${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
+    <h2 style="margin:12px 0 2px">${esc(s.name)}</h2>${r && r.overall ? `<p class="verdict">${esc(verdict(r.overall))}</p>` : ""}${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
     <div class="row">${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
     <div class="tiles" style="--tc:${c.color}">
       <div class="tile tscore"><small>Score</small><b>${r && r.overall ? r.overall.toFixed(1) + "<i>/10</i>" : "–"}</b></div>
@@ -776,8 +778,8 @@ function renderAbout() {
     <h2>The type scale</h2>
     <div class="catlist">${CATS.map(c => `<div class="card"><b><i class="dot" style="background:${c.color};margin:0"></i>${c.id}. ${esc(c.name)}</b><span class="muted">${esc(c.line)}</span></div>`).join("")}</div>
     <h2>How rating works</h2>
-    <p>Visitors answer four questions, each with three named answers: <b>Getting there</b> (Hard trek, Doable, Walk up), <b>Facilities</b> (None, Basics, Full), <b>Cleanliness</b> (Dirty, Passable, Spotless) and <b>Worth the trip</b> (Never again, Maybe, Definitely). The answers average into the score out of 10 shown on every spring.</p>
-    <p>The type above is worked out from the Getting there and Facilities answers, so nobody votes on it separately. Water look (Clear, Milky blue, Cloudy, Muddy), water kind (Sulphur, Iron-rich, Salty, Fizzy, Plain mineral) the entry price (typed in the local currency, or Free) and how you pay (Cash only, Card, QR or bank transfer, Pay in advance online) are shown and searchable but never scored.</p>
+    <p>Visitors answer four questions, each with three named answers: <b>Getting there</b> (Hard trek, Doable, Walk up), <b>Facilities</b> (None, Basics, Full), <b>Cleanliness</b> (Dirty, Passable, Spotless) and <b>Worth the trip</b> (Never again, Maybe, Definitely). The answers average into the score out of 10 shown on every spring, and each score has a name: <b>Hard pass</b> (under 4), <b>Fine if you're nearby</b> (4 to 5.9), <b>Proper good soak</b> (6 to 7.9) and <b>Unmissable</b> (8 and up).</p>
+    <p>The type above describes how easy the spring is to reach and what is on site, and is not a second score. It is worked out from the Getting there and Facilities answers, so nobody votes on it separately. Water look (Clear, Milky blue, Cloudy, Muddy), water kind (Sulphur, Iron-rich, Salty, Fizzy, Plain mineral) the entry price (typed in the local currency, or Free) and how you pay (Cash only, Card, QR or bank transfer, Pay in advance online) are shown and searchable but never scored.</p>
     <h2>Photos</h2>
     <p>Add holiday snaps for everyone to see. If you shoot professional-style pictures, you can agree to let them appear in the planned Thermal Waters of the World book.</p>
     <h2>Businesses</h2>
@@ -851,7 +853,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121n").then(r => r.json()), fetch("data/notes.json?v=20261121n").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121p").then(r => r.json()), fetch("data/notes.json?v=20261121p").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();

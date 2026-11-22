@@ -50,7 +50,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .dot{flex:none;width:12px;height:12px;border-radius:50%;margin-top:5px}
 .item b{display:block}
 .item small{color:var(--muted)}
-.score{margin-left:auto;font-weight:800;color:var(--amber);white-space:nowrap}
+.score{margin-left:auto;font-weight:800;color:var(--teal-d);white-space:nowrap}
 .page{max-width:980px;margin:0 auto;padding:24px 16px 80px;width:100%}
 .prose p,.prose li{max-width:70ch}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:0 0 14px}
@@ -88,7 +88,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .pills button{flex:1;min-width:84px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 8px;font-size:14px;font-weight:600;color:var(--ink,#16313a);cursor:pointer}
 .pills button.on{background:var(--coral);border-color:var(--coral);color:#fff}
-.bigscore{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:34px;color:var(--amber);margin-right:6px}
+.bigscore{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:34px;color:var(--teal-d);margin-right:6px}
 .note{background:#fff8e6;border:1px solid #f1dca0;border-radius:10px;padding:10px 12px;margin:10px 0}
 .writer{background:var(--teal-l);border-left:4px solid var(--teal);border-radius:8px;padding:10px 12px;margin:12px 0}
 .tag{display:inline-block;font-size:12px;border-radius:6px;padding:2px 7px;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
@@ -161,7 +161,9 @@ details.country .regions{padding:0 14px 12px}
 
 .tile{min-height:92px}
 .tile em{display:block;min-height:18px}
-.tile.tscore b{color:var(--amber)}
+.tile.tscore b{color:var(--teal-d)}
+.verdict{margin:0 0 6px;font-weight:700;font-size:17px;color:var(--teal-d)}
+.verdict b{font-family:"Fraunces",Georgia,serif;font-size:20px;margin-right:4px}
 .acts{display:grid;grid-template-columns:1.15fr 1.15fr .8fr .6fr;gap:6px;margin:8px 0}
 .acts .btn{padding:8px 4px;font-size:13px;white-space:nowrap;text-align:center;border-radius:10px}
 .acts .btn.on{background:var(--gold);border-color:var(--gold);color:#3b2a00}
