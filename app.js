@@ -486,18 +486,18 @@ function openSpring(id, push = true) {
     <h2 style="margin:12px 0 2px">${esc(s.name)}</h2>${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
     <div class="row">${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
     <div class="tiles" style="--tc:${c.color}">
-      <div class="tile"><small>Score</small><b>${r && r.overall ? r.overall.toFixed(1) + "<i>/10</i>" : "–"}</b></div>
+      <div class="tile tscore"><small>Score</small><b>${r && r.overall ? r.overall.toFixed(1) + "<i>/10</i>" : "–"}</b><em>${r ? "from " + r.n + " visit" + (r.n > 1 ? "s" : "") : "No ratings yet"}</em></div>
       <div class="tile"><small>Temperature</small><b>${s.temp_c != null ? s.temp_c + "°C" : "–"}</b><em>${s.temp_c != null ? tempClass(s.temp_c) : "Not recorded"}</em></div>
-      <div class="tile"><small>Entry price</small><b>${esc(s.price || "–")}</b></div>
-      <div class="tile"><small>Getting there</small><b>${r && r.per.access ? esc(CRITERIA[0].opts[Math.round(r.per.access) - 1]) : "–"}</b></div>
+      <div class="tile"><small>Entry price</small><b>${esc(s.price || "–")}</b><em>${esc((s.pay || []).join(", ") || "How to pay not yet added")}</em></div>
+      <div class="tile"><small>Getting there</small><b>${r && r.per.access ? esc(CRITERIA[0].opts[Math.round(r.per.access) - 1]) : "–"}</b><em>${r && r.per.access ? "from " + S.agg.get(id).cnt.access + " visit" + (S.agg.get(id).cnt.access > 1 ? "s" : "") : "No ratings yet"}</em></div>
     </div>
     <p class="desc">${esc(describe(s))}</p>
     ${isApprox(s) ? `<div class="warnbox"><b>Approximate position.</b> This pin marks the nearest town, not the spring itself. Ask locally or check before you travel. Know the exact spot? <button class="btn sm" data-act="locate">Update location</button></div>` : ""}
-    <div class="row">
-      <button class="btn sm ${been ? "on" : "ghost"}" data-list="been">${been ? "✓ Been here" : "I have been here"}</button>
-      <button class="btn sm ${want ? "on" : "ghost"}" data-list="want">${want ? "✓ Want to go" : "I want to go"}</button>
+    <div class="acts">
+      <button class="btn sm ${been ? "on" : "ghost"}" data-list="been">${been ? "✓ Been here" : "Been here"}</button>
+      <button class="btn sm ${want ? "on" : "ghost"}" data-list="want">${want ? "✓ Want to go" : "Want to go"}</button>
       <button class="btn sm ghost" data-act="share">Share</button>
-      <button class="btn sm ghost" data-act="show">Show on map</button>
+      <button class="btn sm ghost" data-act="show">Map</button>
     </div>
     ${note ? `<div class="writer"><b>From the writer</b><br>${esc(note.text)}</div>` : ""}
     <div class="facts">${facts.map(f => `<div class="fact"><small>${f[0]}</small><b>${esc(f[1])}</b></div>`).join("")}</div>
@@ -506,7 +506,7 @@ function openSpring(id, push = true) {
     ${r ? `<p><span class="bigscore">${r.overall.toFixed(1)}</span><span class="muted"> out of 10 from ${r.n} visit${r.n > 1 ? "s" : ""}</span></p>
       ${CRITERIA.map(cr => { const v = r.per[cr.id], k = v ? Math.round(v) : 0, pos = v ? Math.max(0, Math.min(100, (v - 1) * 50)) : 0;
         return `<div class="meas"><div class="mh"><span>${cr.label}</span>${v ? "" : `<small class="muted">No answers yet</small>`}</div>
-        <div class="track"><b></b><u style="left:0"></u><u style="left:50%"></u><u style="left:100%"></u>${v ? `<svg class="drop" style="left:${pos}%" viewBox="0 0 24 30" aria-hidden="true"><path d="M12 1C12 1 2 12.5 2 19a10 10 0 0 0 20 0C22 12.5 12 1 12 1z" fill="#0e7c86" stroke="#fff" stroke-width="2"/><path d="M8 19a4 4 0 0 0 4 4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/></svg>` : ""}</div>
+        <div class="track"><b></b><u style="left:0"></u><u style="left:50%"></u><u style="left:100%"></u>${v ? `<svg class="drop" style="left:${pos}%" viewBox="0 0 24 30" aria-hidden="true"><path d="M12 1C12 1 2 12.5 2 19a10 10 0 0 0 20 0C22 12.5 12 1 12 1z" fill="#e8683a" stroke="#fff" stroke-width="2"/><path d="M8 19a4 4 0 0 0 4 4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/></svg>` : ""}</div>
         <div class="segl">${cr.opts.map((o, i) => `<span class="${i + 1 === k ? "on" : ""}">${esc(o)}</span>`).join("")}</div></div>`; }).join("")}`
       : `<p class="muted">No ratings yet.</p>`}
     <button class="btn" data-act="review">${revs.some(x => x.user === me.id) ? "Update my rating" : "Rate this spring"}</button>
@@ -851,7 +851,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121i").then(r => r.json()), fetch("data/notes.json?v=20261121i").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121k").then(r => r.json()), fetch("data/notes.json?v=20261121k").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
