@@ -141,8 +141,42 @@ const Cloud = {
     n.edits.forEach(e => { e.confirm = conf[e.id] || []; if (verd[e.id]) e.verdict = verd[e.id]; });
     SHARED.forEach(k => S[k] = n[k]);
   },
+  /* the emailed button brings the session back in the address: keep it and tidy the address */
+  async fromLink() {
+    const h = location.hash;
+    if (!/access_token=|error_code=/.test(h)) return;
+    const p = new URLSearchParams(h.replace(/^#/, ""));
+    history.replaceState(null, "", location.pathname + location.search + "#me");
+    if (p.get("error_code") || p.get("error")) { this.note = "That email link has expired or was already used. Ask for a new one."; return; }
+    const at = p.get("access_token"), rt = p.get("refresh_token");
+    if (!at || !rt) return;
+    const r = await fetch(this.url + "/auth/v1/user", { headers: { apikey: this.key, Authorization: "Bearer " + at } });
+    if (!r.ok) return;
+    const user = await r.json();
+    this.ses = { access_token: at, refresh_token: rt, expires_at: Math.floor(Date.now() / 1000) + Number(p.get("expires_in") || 3600), user };
+    Store.set("ses", this.ses);
+    this.note = "Signed in as " + (user.email || "your account");
+  },
+  email() { const u = this.ses && this.ses.user; return u && !u.is_anonymous && u.email ? u.email : ""; },
+  /* ask for an email: keep = attach it to this anonymous account, otherwise sign in to an existing one */
+  async emailLink(addr, keep) {
+    const back = encodeURIComponent(location.origin + location.pathname);
+    const t = await this.token();
+    const r = keep
+      ? await fetch(this.url + "/auth/v1/user?redirect_to=" + back, { method: "PUT", headers: { apikey: this.key, Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ email: addr }) })
+      : await fetch(this.url + "/auth/v1/otp?redirect_to=" + back, { method: "POST", headers: { apikey: this.key, "Content-Type": "application/json" }, body: JSON.stringify({ email: addr, create_user: false }) });
+    if (r.ok) return "sent";
+    let j = {}; try { j = await r.json(); } catch (e) { }
+    const c = j.error_code || "";
+    if (c === "email_exists" || c === "email_address_not_authorized") return "exists";
+    if (c === "otp_disabled" || c === "user_not_found") return "none";
+    if (r.status === 429 || c.includes("rate_limit")) return "wait";
+    return "fail";
+  },
+  signOut() { ["ses", "profile", "cloud1"].forEach(k => localStorage.removeItem("tw_" + k)); location.hash = "#me"; location.reload(); },
   async init() {
     try {
+      await this.fromLink();
       await this.token();
       const me = this.uid(), p = profile();
       const old = p.id;
@@ -594,9 +628,13 @@ function renderMe() {
   const myRev = S.reviews.filter(r => r.user === me.id);
   $("#me").innerHTML = `
     <h1>My springs</h1>
-    <div class="card"><b>${esc(me.handle)}</b> <span class="tag">Anonymous account</span>
-      <p class="muted">Your account has no name, email or password and is kept in this browser. Ratings, photos, corrections and listings you add are shared with everyone. Your lists stay private. Pick any handle you like.</p>
+    <div class="card"><b>${esc(me.handle)}</b> <span class="tag">${Cloud.email() ? "Account kept" : "Anonymous account"}</span>
+      <p class="muted">Ratings, photos, corrections and listings you add are shared with everyone. Your lists stay private. Pick any handle you like.</p>
       <div class="row"><input id="hName" value="${esc(me.handle)}" maxlength="24" style="padding:8px;border:1px solid var(--line);border-radius:10px"><button class="btn sm" id="hSave">Change handle</button></div></div>
+    ${!Cloud.on ? "" : Cloud.email() ? `<div class="card"><h2>Your account</h2><p class="muted">Signed in as <b>${esc(Cloud.email())}</b>. Sign in with the same email on any device to get everything back.</p><div class="row"><button class="btn ghost sm" id="aOut">Sign out on this device</button></div></div>` : `<div class="card"><h2>Keep your account on any device</h2>
+      <p class="muted">Your account has no name or password. Add an email and we send you a button: tap it once and this account, with everything you have added, is yours on any device. We use the email only for sign-in links.</p>
+      <div class="row"><input id="aMail" type="email" placeholder="you@example.com" autocomplete="email" style="padding:8px;border:1px solid var(--line);border-radius:10px;min-width:210px"><button class="btn sm" id="aKeep">Keep this account</button></div>
+      <p class="muted" style="margin-top:10px">Already kept an account on another device? <a href="#me" id="aIn">Email me a sign-in link</a> instead.</p><p class="muted" id="aMsg"></p></div>`}
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
       <div class="card"><h2>Places I have been (${S.lists.been.length})</h2>${S.lists.been.map(row).join("") || `<p class="muted">Nothing yet. Open any spring and press "I have been here".</p>`}</div>
       <div class="card"><h2>Places I want to go (${S.lists.want.length})</h2>${S.lists.want.map(row).join("") || `<p class="muted">Nothing yet. Open any spring and press "I want to go".</p>`}</div>
@@ -604,6 +642,10 @@ function renderMe() {
     <div class="card"><h2>My ratings (${myRev.length})</h2>${myRev.map(r => `<div class="item" data-open="${esc(r.spring)}"><div><b>${esc(S.byId.get(r.spring)?.name || r.spring)}</b><small>${stars(r.r.worth)} ${esc(r.text || "")}</small></div></div>`).join("") || `<p class="muted">You have not rated a spring yet.</p>`}</div>
     <div class="row"><button class="btn ghost sm" id="mExport">Download my data</button><button class="btn warn sm" id="mReset">Erase my account and everything I added</button></div>`;
   $("#hSave").onclick = () => { const v = $("#hName").value.trim(); if (v.length < 3) return toast("Handle needs 3 or more characters"); me.handle = v; Store.set("profile", me); S.reviews.filter(r => r.user === me.id).forEach(r => r.handle = v); save("reviews"); renderMe(); toast("Handle changed"); };
+  const mail = async keep => { const v = ($("#aMail").value || "").trim(), m = $("#aMsg"); if (!/^\S+@\S+\.\S+$/.test(v)) { m.textContent = "Type a full email address first."; return; } m.textContent = "Sending..."; let r; try { r = await Cloud.emailLink(v, keep); } catch (e) { r = "fail"; }
+    m.textContent = { sent: "Sent. Open the email on this device and tap the button.", exists: "That email already has an account. Use \"Email me a sign-in link\" below instead.", none: "No account uses that email yet. Use \"Keep this account\" to add it.", wait: "Too many emails just now. Wait a minute and try again.", fail: "Could not send. Try again in a moment." }[r]; };
+  if ($("#aKeep")) { $("#aKeep").onclick = () => mail(true); $("#aIn").onclick = e => { e.preventDefault(); mail(false); }; }
+  if ($("#aOut")) $("#aOut").onclick = () => { if (confirm("Sign out on this device? Sign in again with your email to get everything back.")) Cloud.signOut(); };
   $("#mExport").onclick = () => { const blob = new Blob([JSON.stringify({ profile: me, lists: S.lists, reviews: myRev, added: S.added, edits: S.edits }, null, 1)], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "my-thermal-waters.json"; a.click(); };
   $("#mReset").onclick = async () => { if (confirm("Erase your account, lists, ratings and photos?")) { if (Cloud.on) { try { await Cloud.eraseMine(); } catch (e) { return toast("Could not erase from the shared database. Try again."); } } Object.keys(localStorage).filter(k => k.startsWith("tw_")).forEach(k => localStorage.removeItem(k)); location.hash = "#map"; location.reload(); } };
 }
@@ -623,7 +665,7 @@ function renderAbout() {
     <p>Run a spring or a place beside one? Add a free basic listing from the spring's page. Adverts will cost a small monthly fee, announced at launch.</p>
     <h2>Where the data comes from</h2>
     <p>The starting directory is built from open public-domain and CC0 sources: Wikidata, the NOAA thermal springs list for the United States, and a small editorial set where those are thin (such as Colombia, positions approximate until visitors confirm them). Visitors then confirm, correct and extend it. Map tiles are provided by Esri.</p>
-    <div class="note"><b>Test build.</b> Everything you add is saved on your own device only. A shared database comes next, so ratings and photos from everyone appear together.</div>`;
+    <div class="note"><b>Test build.</b> Ratings, photos and corrections are shared by everyone. Accounts are anonymous; add an email on the My springs tab to keep yours on any device.</div>`;
 }
 
 /* ---------- search ---------- */
@@ -675,5 +717,6 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
   rebuild(); initMap(); initSearch();
   $("#sortSel").onchange = renderList;
   refreshMarkers(); route(); window.addEventListener("hashchange", route);
+  if (Cloud.note) toast(Cloud.note);
   window.TW = S;
 })();
