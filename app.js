@@ -57,9 +57,16 @@ function typeFrom(per) {
   return F < 2.7 ? 4 : 5;
 }
 
-/* ---------- sample spring: invented, shown only so the rating pages can be seen; never saved to the database ---------- */
+/* ---------- Sample Spring: shown only so the pages can be seen with real-looking content; never saved to the database. Remove before launch. ---------- */
 const SAMPLE_ID = "sample-1";
-const sampleSvg = (sky, water, label) => "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="${sky}"/><circle cx="320" cy="60" r="28" fill="#ffe9a8"/><path d="M0 170 L90 110 L170 160 L260 95 L400 175 L400 300 L0 300Z" fill="#7b9a8a"/><ellipse cx="200" cy="225" rx="150" ry="52" fill="#d9d2c3"/><ellipse cx="200" cy="222" rx="132" ry="42" fill="${water}"/><g fill="#fff" opacity=".55"><circle cx="160" cy="205" r="9"/><circle cx="215" cy="198" r="12"/><circle cx="250" cy="214" r="7"/></g><text x="200" y="285" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#16313a">${label}</text></svg>`);
+/* sample pictures: drawn scenes (no captions inside the image) so the sample spring shows photos like a real one */
+const sampleSvg = (o) => {
+  const { top, bot, water, sun = "#ffe9a8", sx = 320, sy = 70, steam = true, hill = "#7b9a8a", far = "#a9bfb6", snow = false } = o;
+  const wisps = steam ? [150, 195, 240].map((x, i) => `<path d="M${x} ${205 - i * 4} q-14 -22 0 -42 q14 -22 0 -44" stroke="#fff" stroke-width="${9 - i}" fill="none" opacity="${.32 - i * .05}" stroke-linecap="round"/>`).join("") : "";
+  const rocks = [[70, 238, 22, 11], [108, 252, 18, 9], [300, 250, 24, 12], [338, 236, 18, 9], [200, 270, 20, 8]].map(([x, y, rx, ry]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#8d8579"/><ellipse cx="${x - 3}" cy="${y - 2}" rx="${rx * .7}" ry="${ry * .6}" fill="#a39b8e"/>`).join("");
+  const trees = [30, 52, 360, 380].map((x, i) => `<path d="M${x} ${186 - i % 2 * 8} l-13 34 h26z" fill="#3f6b57"/><path d="M${x} ${170 - i % 2 * 8} l-10 28 h20z" fill="#4b7c65"/>`).join("");
+  return "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bot}"/></linearGradient><linearGradient id="w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${water}"/><stop offset="1" stop-color="#3aa7b2"/></linearGradient><radialGradient id="s"><stop offset="0" stop-color="${sun}"/><stop offset="1" stop-color="${sun}" stop-opacity="0"/></radialGradient></defs><rect width="400" height="300" fill="url(#a)"/><circle cx="${sx}" cy="${sy}" r="60" fill="url(#s)"/><circle cx="${sx}" cy="${sy}" r="24" fill="${sun}"/><path d="M0 160 L70 105 L140 150 L230 85 L330 150 L400 120 L400 300 L0 300Z" fill="${far}"/>${snow ? `<path d="M230 85 L205 108 L222 104 L232 114 L245 102 L260 108Z" fill="#fff" opacity=".9"/><path d="M70 105 L52 121 L68 117 L78 126 L90 116Z" fill="#fff" opacity=".9"/>` : ""}<path d="M0 190 Q90 140 190 180 T400 165 L400 300 L0 300Z" fill="${hill}"/>${trees}<ellipse cx="200" cy="232" rx="165" ry="56" fill="#cfc7b8"/><ellipse cx="200" cy="228" rx="148" ry="46" fill="url(#w)"/><g fill="none" stroke="#fff" opacity=".5" stroke-width="2"><ellipse cx="175" cy="226" rx="38" ry="9"/><ellipse cx="240" cy="238" rx="30" ry="7"/></g>${wisps}${rocks}</svg>`);
+};
 const SAMPLE = {
   reviews: [
     ["Steamy-Sam", { access: 2, facil: 2, clean: 3, worth: 3 }, "Free, quiet and properly hot. A 20 minute walk from the car park.", "Clear", ["Sulphur"], [], { free: true }],
@@ -70,10 +77,13 @@ const SAMPLE = {
     ["Kettle-Kat", { access: 1, facil: 1, clean: 1, worth: 2 }, "Busy at weekends and the path is rough.", "Cloudy", [], [], { free: true }]
   ].map(([h, r, t, look, kinds, pay, price], i) => ({ spring: SAMPLE_ID, user: "sample-u" + i, handle: h, r, text: t, water: { look, kinds }, pay, price, date: "2026-11-0" + (i + 1) + "T10:00:00Z" })),
   photos: [
-    { kind: "pro", caption: "Dawn over the main pool", data: sampleSvg("#f6c9a0", "#7fd0d6", "Dawn over the main pool"), terms: true },
-    { kind: "snap", caption: "Our towels on the rocks", data: sampleSvg("#bfe3f0", "#5bbcc7", "Our towels on the rocks"), terms: false },
-    { kind: "snap", caption: "Steam on a cold morning", data: sampleSvg("#d6dde2", "#8fd6da", "Steam on a cold morning"), terms: false }
-  ].map((p, i) => Object.assign(p, { spring: SAMPLE_ID, user: "sample-u" + i, handle: ["Steamy-Sam", "Pool-Pete", "Mia-in-Mud"][i], date: "2026-11-0" + (i + 1) + "T10:00:00Z", id: "sample-p" + i }))
+    { kind: "pro", caption: "Dawn over the main pool", data: sampleSvg({ top: "#f2a97c", bot: "#fbe3c4", water: "#8fdbe0", sx: 90, sy: 95 }), terms: true },
+    { kind: "pro", caption: "Midday from the upper path", data: sampleSvg({ top: "#6fb7e8", bot: "#d9f0fb", water: "#6fd0d6", sun: "#fff6c8", steam: false }), terms: true },
+    { kind: "snap", caption: "Steam on a cold morning", data: sampleSvg({ top: "#b9c6cf", bot: "#e6ecef", water: "#9adadd", sun: "#f3f3f3", hill: "#6f8c80", far: "#9db0aa" }), terms: false },
+    { kind: "snap", caption: "Sunset soak", data: sampleSvg({ top: "#6b4f8f", bot: "#f08a6b", water: "#a6d8e6", sun: "#ffd27a", sx: 300, sy: 120, hill: "#5d7467", far: "#8b8aa6" }), terms: false },
+    { kind: "snap", caption: "Our towels on the rocks", data: sampleSvg({ top: "#8cc9ee", bot: "#e7f5fc", water: "#6fd0d6", steam: false, hill: "#86a597" }), terms: false },
+    { kind: "snap", caption: "First snow on the ridge", data: sampleSvg({ top: "#9fb8d0", bot: "#e9eff5", water: "#86d3dc", snow: true, hill: "#7a8f88", far: "#b7c5cf", sun: "#fff" }), terms: false }
+  ].map((p, i) => Object.assign(p, { spring: SAMPLE_ID, user: "sample-u" + (i % 6), handle: ["Steamy-Sam", "Pool-Pete", "Mia-in-Mud", "Tubby-Tom", "Lagoon-Lou", "Kettle-Kat"][i], date: "2026-11-0" + (i + 1) + "T10:00:00Z", id: "sample-p" + i }))
 };
 
 const PHOTO_TERMS = "By choosing Professional-style you confirm you took the photo (or hold the rights), you keep your copyright, and you allow Thermal Waters of the World to show it on this site and to use it in the planned Thermal Waters of the World book, with your first name or handle as the credit. Holiday snaps are shown on the site only, as everyday reference. You can remove your photos at any time. (Draft wording for the test build.)";
@@ -574,7 +584,7 @@ function openReview(id) {
     $("#rSave", sh).onclick = () => {
       const need = CRITERIA.find(c => !val[c.id]);
       if (need) return toast("Please answer: " + need.label);
-      if (id === SAMPLE_ID) return toast("This is an example spring, so nothing is saved. Rate a real spring.");
+      if (id === SAMPLE_ID) return toast("Sample Spring: nothing is saved here. Rate a real spring.");
       S.reviews = S.reviews.filter(x => !(x.spring === id && x.user === me.id));
       const amt = parseFloat(String($("#pAmt", sh).value).replace(/,/g, "")), price = $("#pFree", sh).checked ? { free: true } : amt > 0 ? { amount: amt, cur: $("#pCur", sh).value } : null;
       S.reviews.push({ spring: id, user: me.id, handle: me.handle, price, r: Object.assign({}, val), water: { look: water.look, kinds: Array.from(water.kinds) }, pay: Array.from(pay), text: $("#rText", sh).value.trim(), date: new Date().toISOString() });
@@ -840,7 +850,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121g").then(r => r.json()), fetch("data/notes.json?v=20261121g").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121h").then(r => r.json()), fetch("data/notes.json?v=20261121h").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
