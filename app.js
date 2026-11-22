@@ -6,6 +6,7 @@
 const CONFIG = {
   confirmThreshold: 1,          // votes needed before a suggested correction shows (the proposer counts as one; test build = 1, launch = 2)
   maxPhotoPx: 1000,
+  hideAfter: 3,                 // distinct visitors who must report a post before it is hidden for everyone (the reporter never sees it again)
   tiles: {
     topo: { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", attr: "Map tiles &copy; Esri" },
     sat:  { url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", attr: "Map tiles &copy; Esri" }
@@ -106,7 +107,7 @@ const blankFilters = q => ({ q, cats: new Set(), country: "", temp: "", minRatin
 const S = {
   springs: [], byId: new Map(), notes: {},
   reviews: Store.get("reviews", []), photos: Store.get("photos", []), lists: Store.get("lists", { been: [], want: [] }),
-  edits: Store.get("edits", []), added: Store.get("added", []), listings: Store.get("listings", []), cats: Store.get("cats", []),
+  edits: Store.get("edits", []), added: Store.get("added", []), listings: Store.get("listings", []), cats: Store.get("cats", []), reports: Store.get("reports", []), hide: new Set(),
   f: blankFilters(""),
   view: "map", map: null, cluster: null, layer: "topo", userPos: null
 };
@@ -115,7 +116,7 @@ const S = {
    ratings, photos, corrections, listings and added springs. The key below is the public
    (anon) key: row-level security in supabase/schema.sql decides what anyone may do.
    If the database cannot be reached the site falls back to this device only. */
-const SHARED = ["reviews", "photos", "edits", "listings", "cats", "added", "lists"];
+const SHARED = ["reviews", "photos", "edits", "listings", "cats", "added", "lists", "reports"];
 const Cloud = {
   url: "https://fbchngfatwtjwttohhoe.supabase.co",
   key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZiY2huZ2ZhdHd0and0dG9oaG9lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUzMDE5NjksImV4cCI6MjExMDg3Nzk2OX0.9WJQk4Xb8AVwziD3M6kbww3CNdkES3RzvIk7umgPQGg",
@@ -150,10 +151,11 @@ const Cloud = {
     if (k === "listings") S.listings.filter(l => l.user === me).forEach(l => put("listing", l.id, l.spring, l));
     if (k === "cats") S.cats.filter(c => c.user === me).forEach(c => put("cat", c.spring + "|" + me, c.spring, c));
     if (k === "added") S.added.filter(a => a.user === me).forEach(a => put("added", a.id, a.id, a));
+    if (k === "reports") S.reports.filter(r => r.user === me).forEach(r => put("report", r.id, r.spring, r));
     if (k === "lists") ["been", "want"].forEach(w => S.lists[w].forEach(id => put("list", me + "|" + w + "|" + id, id, { kind: w, spring: id })));
     return out;
   },
-  kinds: { reviews: ["review"], photos: ["photo"], edits: ["edit", "confirm"], listings: ["listing"], cats: ["cat"], added: ["added"], lists: ["list"] },
+  kinds: { reviews: ["review"], photos: ["photo"], edits: ["edit", "confirm"], listings: ["listing"], cats: ["cat"], added: ["added"], lists: ["list"], reports: ["report"] },
   async uploadPhotos() {
     const me = this.uid();
     for (const p of S.photos.filter(p => p.user === me && String(p.data).startsWith("data:"))) {
@@ -180,7 +182,7 @@ const Cloud = {
       const r = await this.call("/rest/v1/items?select=kind,id,spring,user_id,doc&order=created_at.asc&limit=1000&offset=" + off);
       const part = await r.json(); rows.push(...part); if (part.length < 1000) break;
     }
-    const n = { reviews: [], photos: [], edits: [], listings: [], cats: [], added: [], lists: { been: [], want: [] } }, conf = {}, verd = {};
+    const n = { reviews: [], photos: [], edits: [], listings: [], cats: [], added: [], reports: [], lists: { been: [], want: [] } }, conf = {}, verd = {};
     this.mine = {};
     rows.forEach(x => {
       if (x.user_id === me) this.mine[x.kind + "/" + x.id] = JSON.stringify(x.doc);
@@ -191,6 +193,7 @@ const Cloud = {
       else if (x.kind === "verdict") verd[x.doc.edit] = x.doc;
       else if (x.kind === "confirm") (conf[x.doc.edit] = conf[x.doc.edit] || []).push(x.user_id);
       else if (x.kind === "listing") n.listings.push(d);
+      else if (x.kind === "report") n.reports.push(d);
       else if (x.kind === "cat") n.cats.push(d);
       else if (x.kind === "added") n.added.push(d);
       else if (x.kind === "list" && x.user_id === me) (n.lists[x.doc.kind] || []).push(x.doc.spring);
@@ -291,10 +294,23 @@ function editText(e) {
   return e.value;
 }
 /* corrections that still need more confirms before they show */
-const pendingFor = id => S.edits.filter(e => e.spring === id && e.field !== "position" && !e.rejected && 1 + (e.confirm || []).length < CONFIG.confirmThreshold);
+/* reported posts: hidden for the reporter at once, and for everyone once enough different visitors report the same post */
+const reportKey = (kind, key) => kind + "/" + key;
+function computeHidden() {
+  const me = profile().id, by = new Map();
+  S.reports.forEach(r => { const k = reportKey(r.target, r.key); if (!by.has(k)) by.set(k, new Set()); by.get(k).add(r.user); });
+  S.hide = new Set(); by.forEach((u, k) => { if (u.size >= CONFIG.hideAfter || u.has(me)) S.hide.add(k); });
+}
+const shown = (kind, key) => !S.hide.has(reportKey(kind, key));
+const rptBtn = (kind, key, mine) => mine ? "" : ` <button type="button" class="lnk" data-rk="${esc(kind)}" data-rid="${esc(key)}">Report</button>`;
+const liveReviews = () => S.reviews.filter(r => shown("review", r.spring + "|" + r.user));
+const livePhotos = () => S.photos.filter(p => shown("photo", p.id));
+const liveEdits = () => S.edits.filter(e => shown("edit", e.id));
+const liveListings = () => S.listings.filter(l => shown("listing", l.id));
+const pendingFor = id => liveEdits().filter(e => e.spring === id && e.field !== "position" && !e.rejected && 1 + (e.confirm || []).length < CONFIG.confirmThreshold);
 function applyEdits(s) {
   const o = Object.assign({}, s);
-  const mine = S.edits.filter(e => e.spring === s.id && !e.rejected && !(e.verdict && e.verdict.verdict === "rejected"));
+  const mine = liveEdits().filter(e => e.spring === s.id && !e.rejected && !(e.verdict && e.verdict.verdict === "rejected"));
   const best = {};
   mine.forEach(e => { if (e.field === "position") { if (e.verdict && e.verdict.verdict === "verified") { try { const p = JSON.parse(e.value); if (!best.position || e.date > best.position.e.date) best.position = { v: 9, e, p }; } catch (x) { } } return; }
     const v = 1 + (e.confirm || []).length; if (v >= CONFIG.confirmThreshold && (!best[e.field] || v >= best[e.field].v)) best[e.field] = { v, e }; });
@@ -331,20 +347,21 @@ function applyEdits(s) {
   return o;
 }
 function rebuild() {
+  computeHidden();
   S.reviews = S.reviews.filter(r => r.spring !== SAMPLE_ID).concat(SAMPLE.reviews);
   S.photos = S.photos.filter(p => p.spring !== SAMPLE_ID).concat(SAMPLE.photos);
   S.agg = new Map();
-  S.reviews.forEach(r => { const a = S.agg.get(r.spring) || { n: 0, sum: {}, cnt: {}, look: {}, kinds: {}, pay: {}, free: 0, paid: {} }, v = norm(r.r || {});
+  liveReviews().forEach(r => { const a = S.agg.get(r.spring) || { n: 0, sum: {}, cnt: {}, look: {}, kinds: {}, pay: {}, free: 0, paid: {} }, v = norm(r.r || {});
     a.n++; CRITERIA.forEach(c => { if (v[c.id]) { a.sum[c.id] = (a.sum[c.id] || 0) + v[c.id]; a.cnt[c.id] = (a.cnt[c.id] || 0) + 1; } });
     if (r.water && r.water.look) a.look[r.water.look] = (a.look[r.water.look] || 0) + 1;
     ((r.water && r.water.kinds) || []).forEach(k => a.kinds[k] = (a.kinds[k] || 0) + 1);
     (r.pay || []).forEach(k => a.pay[k] = (a.pay[k] || 0) + 1);
     if (r.price && r.price.free) a.free++; else if (r.price && r.price.amount > 0) (a.paid[r.price.cur] = a.paid[r.price.cur] || []).push(Number(r.price.amount));
     S.agg.set(r.spring, a); });
-  const all = S.springs_base.concat(S.added.map(a => Object.assign({ src: "Community", userAdded: true }, a)));
+  const all = S.springs_base.concat(S.added.filter(a => shown("added", a.id)).map(a => Object.assign({ src: "Community", userAdded: true }, a)));
   S.springs = all.map(applyEdits);
   S.byId = new Map(S.springs.map(s => [s.id, s]));
-  S.photoCount = new Map(); S.photos.forEach(p => S.photoCount.set(p.spring, (S.photoCount.get(p.spring) || 0) + 1));
+  S.photoCount = new Map(); livePhotos().forEach(p => S.photoCount.set(p.spring, (S.photoCount.get(p.spring) || 0) + 1));
 }
 function rating(id) {
   const a = S.agg.get(id); if (!a) return null;
@@ -487,10 +504,10 @@ function openSpring(id, push = true) {
   if (push) history.replaceState(null, "", "#spring=" + encodeURIComponent(id));
   const c = catOf(s.cat), r = rating(id), me = profile();
   const been = S.lists.been.includes(id), want = S.lists.want.includes(id);
-  const revs = S.reviews.filter(x => x.spring === id).sort((a, b) => b.date.localeCompare(a.date));
-  const phs = S.photos.filter(p => p.spring === id);
-  const eds = S.edits.filter(e => e.spring === id && !e.rejected);
-  const lst = S.listings.filter(l => l.spring === id);
+  const revs = liveReviews().filter(x => x.spring === id).sort((a, b) => b.date.localeCompare(a.date));
+  const phs = livePhotos().filter(p => p.spring === id);
+  const eds = liveEdits().filter(e => e.spring === id && !e.rejected);
+  const lst = liveListings().filter(l => l.spring === id);
   const note = S.notes[id];
   /* main photo: the first professional-style photo, otherwise the first holiday snap */
   const hero = phs.filter(p => p.kind === "pro").sort((a, z) => String(a.date).localeCompare(String(z.date)))[0] || phs.slice().sort((a, z) => String(a.date).localeCompare(String(z.date)))[0] || null;
@@ -506,7 +523,7 @@ function openSpring(id, push = true) {
       <div class="herotag"><b>${esc(c.name)}</b><span>${esc(c.plain)}</span></div>
     </div>
     <h2 style="margin:12px 0 2px">${esc(s.name)}</h2>${r && r.overall ? `<p class="verdict">${esc(verdict(r.overall))}</p>` : ""}${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
-    <div class="row">${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
+    <div class="row">${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>${rptBtn("added", s.id, s.user === me.id)}` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
     <div class="tiles" style="--tc:${c.color}">
       <div class="tile tscore"><small>Score</small><b>${r && r.overall ? r.overall.toFixed(1) + "<i>/10</i>" : "–"}</b></div>
       <div class="tile"><small>Temperature</small><b>${s.temp_c != null ? s.temp_c + "°C <i>" + tempClass(s.temp_c) + "</i>" : "–"}</b></div>
@@ -536,15 +553,15 @@ function openSpring(id, push = true) {
         <div class="segl">${cr.opts.map((o, i) => `<span class="${i + 1 === k ? "on" : ""}">${esc(o)}</span>`).join("")}</div></div>`; }).join("")}`
       : `<p class="muted">No ratings yet.</p>`}
     <button class="btn" data-act="review">${revs.some(x => x.user === me.id) ? "Update my rating" : "Rate this spring"}</button>
-    ${revs.filter(x => x.text).map(x => { const v = norm(x.r || {}); return `<div class="card" style="margin-top:10px"><b>${esc(x.handle)}</b> ${v.worth ? `<span class="tag">${esc(answerWord(CRITERIA.find(c => c.id === "worth"), v.worth))}</span>` : ""}<br>${esc(x.text)}<br><small class="muted">${new Date(x.date).toLocaleDateString("en-GB")}</small></div>`; }).join("")}
+    ${revs.filter(x => x.text).map(x => { const v = norm(x.r || {}); return `<div class="card" style="margin-top:10px"><b>${esc(x.handle)}</b> ${v.worth ? `<span class="tag">${esc(answerWord(CRITERIA.find(c => c.id === "worth"), v.worth))}</span>` : ""}<br>${esc(x.text)}<br><small class="muted">${new Date(x.date).toLocaleDateString("en-GB")}</small>${rptBtn("review", x.spring + "|" + x.user, x.user === me.id)}</div>`; }).join("")}
     <h3 style="margin-top:18px">Check the details</h3>
     <p class="muted">Correct anything that is wrong. A suggestion shows once another visitor confirms it${CONFIG.confirmThreshold < 2 ? " (test build: shows straight away)" : ""}.</p>
     ${eds.map(e => e.field === "position" ? posCard(e) : `<div class="card"><b>${esc(EDIT_LABEL[e.field] || e.field)}:</b> ${esc(editText(e))}<br>
       <small class="muted">Suggested by ${esc(e.handle)} · ${1 + (e.confirm || []).length} confirm${(e.confirm || []).length ? "s" : ""}</small>
-      ${e.user !== me.id && !(e.confirm || []).includes(me.id) ? ` <button class="btn sm ghost" data-confirm="${esc(e.id)}">Confirm</button>` : ""}</div>`).join("")}
+      ${e.user !== me.id && !(e.confirm || []).includes(me.id) ? ` <button class="btn sm ghost" data-confirm="${esc(e.id)}">Confirm</button>` : ""}${rptBtn("edit", e.id, e.user === me.id)}</div>`).join("")}
     <button class="btn ghost sm" data-act="correct">Suggest a correction</button> <button class="btn ghost sm" data-act="locate">Update location</button>
     <h3 style="margin-top:18px">Local listings</h3>
-    ${lst.length ? lst.map(l => `<div class="card"><b>${esc(l.name)}</b> <span class="tag">${l.plan === "advert" ? "Advert" : "Free listing"}</span><br>${esc(l.text)}${l.web ? `<br><a href="${esc(l.web)}" rel="noopener nofollow" target="_blank">${esc(l.web)}</a>` : ""}</div>`).join("") : `<p class="muted">No business listed here yet.</p>`}
+    ${lst.length ? lst.map(l => `<div class="card"><b>${esc(l.name)}</b> <span class="tag">${l.plan === "advert" ? "Advert" : "Free listing"}</span><br>${esc(l.text)}${l.web ? `<br><a href="${esc(l.web)}" rel="noopener nofollow" target="_blank">${esc(l.web)}</a>` : ""}${rptBtn("listing", l.id, l.user === me.id)}</div>`).join("") : `<p class="muted">No business listed here yet.</p>`}
     <button class="btn ghost sm" data-act="list">Run this spring? Add a free listing</button>`;
   openSheet(s.name, html, sh => {
     sh.onclick = ev => {
@@ -558,7 +575,8 @@ function openSpring(id, push = true) {
       else if (t.dataset.act === "locate") openLocate(id);
       else if (t.dataset.act === "list") openListing(id);
       else if (t.dataset.confirm) { confirmEdit(t.dataset.confirm, id); }
-      else if (t.dataset.ph != null) { const p = phs[Number(t.dataset.ph)]; openSheet(s.name + ": photo", `<img src="${p.data}" style="width:100%;border-radius:10px"><p><span class="tag">${p.kind === "pro" ? "Professional-style (book terms agreed)" : "Holiday snap"}</span> by ${esc(p.handle)}${p.caption ? "<br>" + esc(p.caption) : ""}</p><button class="btn ghost" id="backS">Back</button>`, h => $("#backS", h).onclick = () => openSpring(id, false)); }
+      else if (t.dataset.rk) openReport(t.dataset.rk, t.dataset.rid, id);
+      else if (t.dataset.ph != null) { const p = phs[Number(t.dataset.ph)]; openSheet(s.name + ": photo", `<img src="${p.data}" style="width:100%;border-radius:10px"><p><span class="tag">${p.kind === "pro" ? "Professional-style (book terms agreed)" : "Holiday snap"}</span> by ${esc(p.handle)}${p.caption ? "<br>" + esc(p.caption) : ""}</p><button class="btn ghost" id="backS">Back</button>${rptBtn("photo", p.id, p.user === me.id)}`, h => { $("#backS", h).onclick = () => openSpring(id, false); const rb = $("[data-rk]", h); if (rb) rb.onclick = () => openReport(rb.dataset.rk, rb.dataset.rid, id); }); }
     };
   });
 }
@@ -571,6 +589,25 @@ function share(id) {
   const url = location.origin + location.pathname + "#spring=" + encodeURIComponent(id);
   if (navigator.share) navigator.share({ title: S.byId.get(id).name, url }).catch(() => { });
   else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast("Link copied"));
+}
+function openReport(kind, key, id) {
+  const me = profile(), why = ["Spam or advert", "Abusive or rude", "Wrong or misleading", "Not their photo or copyright", "Something else"];
+  let reason = "";
+  const target = kind === "review" ? S.reviews.find(r => r.spring + "|" + r.user === key) : kind === "photo" ? S.photos.find(p => p.id === key) : kind === "listing" ? S.listings.find(l => l.id === key) : kind === "edit" ? S.edits.find(e => e.id === key) : S.added.find(a => a.id === key);
+  const excerpt = target ? String(target.text || target.caption || target.name || target.value || "").slice(0, 160) : "";
+  openSheet("Report this " + ({ review: "rating", photo: "photo", listing: "listing", edit: "correction", added: "spring" })[kind], `
+    <p class="muted">Pick the reason. It is hidden for you straight away, and hidden for everyone once ${CONFIG.hideAfter} visitors report it.</p>
+    <div class="row" id="rWhy">${why.map(w => `<button type="button" class="chip btn" data-why="${esc(w)}">${esc(w)}</button>`).join("")}</div>
+    <div class="row"><button class="btn" id="rpSend">Send report</button><button class="btn ghost" id="rpBack">Back</button></div>`, sh => {
+    $$("[data-why]", sh).forEach(b => b.onclick = () => { reason = b.dataset.why; $$("[data-why]", sh).forEach(x => x.classList.toggle("on", x === b)); });
+    $("#rpBack", sh).onclick = () => openSpring(id, false);
+    $("#rpSend", sh).onclick = () => {
+      if (!reason) return toast("Pick a reason");
+      if (id === SAMPLE_ID) return toast("Sample Spring: nothing is saved here.");
+      S.reports.push({ id: kind + "|" + key + "|" + me.id, target: kind, key, spring: id, reason, excerpt, user: me.id, date: new Date().toISOString() });
+      save("reports"); rebuild(); refreshMarkers(); toast("Reported. Thank you."); openSpring(id, false);
+    };
+  });
 }
 function confirmEdit(eid, id) {
   const e = S.edits.find(x => x.id === eid), me = profile(); if (!e) return;
@@ -959,7 +996,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121v").then(r => r.json()), fetch("data/notes.json?v=20261121v").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121w").then(r => r.json()), fetch("data/notes.json?v=20261121w").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();

@@ -187,3 +187,4 @@ details.country .regions{padding:0 14px 12px}
 .linkcard a{margin-right:16px;font-weight:700}
 a.linkcard.big{display:block;text-decoration:none;color:inherit}a.linkcard.big b{display:block;color:var(--teal-d)}
 .prose .card>b{display:block;margin-bottom:4px}
+.lnk{background:none;border:0;padding:0 0 0 8px;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer}
