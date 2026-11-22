@@ -282,6 +282,16 @@ function metaLine(s) {
 /* ---------- data model ---------- */
 const isApprox = s => !s.posConfirmed && String(s.src || "").startsWith("Editorial");
 const LOC_HOW = { gps: "I stood there and used GPS", sat: "I can see it on satellite imagery", local: "Local knowledge (I live nearby or visited)", sign: "An official sign, website or map" };
+const EDIT_LABEL = { name: "Name", temp_c: "Temperature °C", access: "Directions", cost: "Cost", closed: "Closed or gone", price: "Entry price", look: "Water look", kind: "Water kind", pay: "How to pay" };
+function editText(e) {
+  try {
+    if (e.field === "price") { const p = JSON.parse(e.value); return p.free ? "Free" : money(p.amount, p.cur); }
+    if (e.field === "kind" || e.field === "pay") return JSON.parse(e.value).join(", ") || "None";
+  } catch (x) { }
+  return e.value;
+}
+/* corrections that still need more confirms before they show */
+const pendingFor = id => S.edits.filter(e => e.spring === id && e.field !== "position" && !e.rejected && 1 + (e.confirm || []).length < CONFIG.confirmThreshold);
 function applyEdits(s) {
   const o = Object.assign({}, s);
   const mine = S.edits.filter(e => e.spring === s.id && !e.rejected && !(e.verdict && e.verdict.verdict === "rejected"));
@@ -309,6 +319,15 @@ function applyEdits(s) {
     if (a.free > paidN) { o.price = "Free"; o.priceKind = "Free"; }
     else if (cur) { const l = a.paid[cur].slice().sort((x, z) => x - z); o.price = money(l[Math.floor(l.length / 2)], cur); o.priceKind = "Paid"; }
   }
+  Object.keys(best).forEach(f => {
+    const val = best[f].e.value;
+    if (f === "position") return;
+    if (0) { }
+    else if (f === "look") { o.look = val; o.fixed = 1; }
+    else if (f === "kind") { try { o.kinds = JSON.parse(val); } catch (x) { } }
+    else if (f === "pay") { try { o.pay = JSON.parse(val); } catch (x) { } }
+    else if (f === "price") { try { const p = JSON.parse(val); if (p.free) { o.price = "Free"; o.priceKind = "Free"; } else { o.price = money(p.amount, p.cur); o.priceKind = "Paid"; } } catch (x) { } }
+  });
   return o;
 }
 function rebuild() {
@@ -386,7 +405,7 @@ function refreshMarkers() {
     ms.push(m);
   });
   S.cluster.addLayers(ms);
-  $("#statline").textContent = `${fmt(ms.length)} springs shown of ${fmt(S.springs.length)}`;
+  S.shownN = ms.length; S.allN = S.springs.length;
   const n = activeFilters(); const b = $("#fcount"); b.hidden = !n; b.textContent = n;
   renderList();
 }
@@ -401,13 +420,14 @@ function renderList() {
   else if (sort === "temp") arr.sort((a, z) => (z.temp_c ?? -99) - (a.temp_c ?? -99));
   else arr.sort((a, z) => ((rating(z.id)?.overall ?? 0) - (rating(a.id)?.overall ?? 0)) || ((S.photoCount.get(z.id) || 0) - (S.photoCount.get(a.id) || 0)) || a.name.localeCompare(z.name));
   arr = arr.slice(0, 60);
-  $("#listTitle").textContent = `${fmt(total)} in view`;
+  $("#statline").textContent = `${fmt(total)} springs in view of ${fmt(S.shownN)}`;
+  $("#listTitle").textContent = "Springs in view";
   $("#list").innerHTML = arr.length ? arr.map(itemHtml).join("") : `<div class="item"><span class="muted">Nothing here with these filters. Zoom out or clear the filters.</span></div>`;
 }
 function itemHtml(s) {
   const c = catOf(s.cat), r = rating(s.id);
   return `<div class="item" data-open="${esc(s.id)}"><span class="dot" style="background:${c.color}"></span>
-    <div><b>${esc(s.name)}</b><small>${esc([s.region, s.country].filter(Boolean).join(", "))}<br>${esc(metaLine(s))}${isApprox(s) ? " · <span class=\"warntxt\">approximate position</span>" : ""}</small></div>
+    <div><b>${esc(s.name)}</b><small>${esc([s.region, s.country].filter(Boolean).join(", "))}<br>${esc(metaLine(s))}${isApprox(s) ? " · <span class=\"warntxt\">approximate position</span>" : ""}${pendingFor(s.id).length ? " · <span class=\"pendtag\">Correction waiting</span>" : ""}</small></div>
     <span class="score">${r ? r.overall.toFixed(1) : ""}</span></div>`;
 }
 function locate() {
@@ -494,6 +514,7 @@ function openSpring(id, push = true) {
       <div class="tile"><small>Getting there</small><b>${r && r.per.access ? esc(CRITERIA[0].opts[Math.round(r.per.access) - 1]) : "–"}</b></div>
     </div>
     <p class="desc">${esc(describe(s))}</p>
+    ${pendingFor(id).map(e => { const n = 1 + (e.confirm || []).length; return `<div class="warnbox pend"><b>Suggested correction:</b> ${esc(EDIT_LABEL[e.field] || e.field)}: ${esc(editText(e))}<br><small>${n} of ${CONFIG.confirmThreshold} agree. The current details stay until it is confirmed.</small>${e.user !== me.id && !(e.confirm || []).includes(me.id) ? ` <button class="btn sm" data-confirm="${esc(e.id)}">I agree</button>` : ""}</div>`; }).join("")}
     ${isApprox(s) ? `<div class="warnbox"><b>Approximate position.</b> This pin marks the nearest town, not the spring itself. Ask locally or check before you travel. Know the exact spot? <button class="btn sm" data-act="locate">Update location</button></div>` : ""}
     <div class="acts">
       <button class="btn sm ${been ? "on" : "ghost"}" data-list="been">${been ? "✓ Been here" : "Been here"}</button>
@@ -518,7 +539,7 @@ function openSpring(id, push = true) {
     ${revs.filter(x => x.text).map(x => { const v = norm(x.r || {}); return `<div class="card" style="margin-top:10px"><b>${esc(x.handle)}</b> ${v.worth ? `<span class="tag">${esc(answerWord(CRITERIA.find(c => c.id === "worth"), v.worth))}</span>` : ""}<br>${esc(x.text)}<br><small class="muted">${new Date(x.date).toLocaleDateString("en-GB")}</small></div>`; }).join("")}
     <h3 style="margin-top:18px">Check the details</h3>
     <p class="muted">Correct anything that is wrong. A suggestion shows once another visitor confirms it${CONFIG.confirmThreshold < 2 ? " (test build: shows straight away)" : ""}.</p>
-    ${eds.map(e => e.field === "position" ? posCard(e) : `<div class="card"><b>${esc(({ name: "Name", temp_c: "Temperature °C", access: "Getting there", cost: "Cost", closed: "Closed or gone" })[e.field] || e.field)}:</b> ${esc(e.value)}<br>
+    ${eds.map(e => e.field === "position" ? posCard(e) : `<div class="card"><b>${esc(EDIT_LABEL[e.field] || e.field)}:</b> ${esc(editText(e))}<br>
       <small class="muted">Suggested by ${esc(e.handle)} · ${1 + (e.confirm || []).length} confirm${(e.confirm || []).length ? "s" : ""}</small>
       ${e.user !== me.id && !(e.confirm || []).includes(me.id) ? ` <button class="btn sm ghost" data-confirm="${esc(e.id)}">Confirm</button>` : ""}</div>`).join("")}
     <button class="btn ghost sm" data-act="correct">Suggest a correction</button> <button class="btn ghost sm" data-act="locate">Update location</button>
@@ -630,19 +651,42 @@ function openPhoto(id) {
 }
 function openCorrect(id) {
   const s = S.byId.get(id), me = profile();
+  const F = { temp_c: "Water temperature (°C)", price: "Entry price", look: "Water look", kind: "Water kind", pay: "How to pay", name: "Name", access: "Directions (how to get there)", closed: "It is closed or gone" };
+  const st = { look: "", kind: new Set(), pay: new Set() };
+  const chips = (key, list) => list.map(o => `<button type="button" class="chip btn" data-${key}="${esc(o)}">${esc(o)}</button>`).join("");
+  const inputFor = f => f === "price" ? `<label style="font-weight:400"><input type="checkbox" id="cFree" style="width:auto"> It is free</label>
+      <div class="row"><input id="cAmt" inputmode="decimal" placeholder="Amount" style="flex:1;min-width:90px;padding:9px 10px;border:1px solid var(--line);border-radius:10px"><select id="cCur" style="padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff">${CUR_LIST.map(c => `<option ${c === curOf(s) ? "selected" : ""}>${c}</option>`).join("")}</select></div>`
+    : f === "look" ? `<div class="row">${chips("look", WATER_LOOK)}</div>`
+    : f === "kind" ? `<small class="muted">Tick any</small><div class="row">${chips("kind", WATER_KIND)}</div>`
+    : f === "pay" ? `<small class="muted">Tick any</small><div class="row">${chips("pay", PAY)}</div>`
+    : `<input id="cVal" maxlength="200" ${f === "closed" ? 'placeholder="Optional note"' : ""}>`;
   openSheet("Suggest a correction", `
-    <label class="field"><span>What needs changing?</span><select id="cField">
-      <option value="temp_c">Water temperature (°C)</option><option value="name">Name</option><option value="access">Getting there</option><option value="cost">Cost</option><option value="closed">It is closed or gone</option></select></label>
-    <label class="field"><span>Correct value</span><input id="cVal" maxlength="200"></label>
+    <label class="field"><span>What needs changing?</span><select id="cField">${Object.keys(F).map(k => `<option value="${k}">${F[k]}</option>`).join("")}</select></label>
+    <div class="field" id="cBox"><span>Correct value</span><div id="cIn"></div></div>
     <div class="row"><button class="btn" id="cSave">Send</button><button class="btn ghost" id="cBack">Back</button></div>`, sh => {
+    const wire = () => {
+      const f = $("#cField", sh).value; $("#cIn", sh).innerHTML = inputFor(f); st.look = ""; st.kind.clear(); st.pay.clear();
+      $$("[data-look]", sh).forEach(b => b.onclick = () => { st.look = st.look === b.dataset.look ? "" : b.dataset.look; $$("[data-look]", sh).forEach(x => x.classList.toggle("on", x.dataset.look === st.look)); });
+      $$("[data-kind]", sh).forEach(b => b.onclick = () => { const k = b.dataset.kind; st.kind.has(k) ? st.kind.delete(k) : st.kind.add(k); b.classList.toggle("on"); });
+      $$("[data-pay]", sh).forEach(b => b.onclick = () => { const k = b.dataset.pay; st.pay.has(k) ? st.pay.delete(k) : st.pay.add(k); b.classList.toggle("on"); });
+      const fr = $("#cFree", sh); if (fr) fr.onchange = () => { $("#cAmt", sh).disabled = $("#cCur", sh).disabled = fr.checked; };
+    };
+    $("#cField", sh).onchange = wire; wire();
     $("#cBack", sh).onclick = () => openSpring(id, false);
     $("#cSave", sh).onclick = () => {
-      const field = $("#cField", sh).value; let value = $("#cVal", sh).value.trim();
-      if (field === "closed") value = value || "Reported closed";
+      const field = $("#cField", sh).value; let value = "";
+      if (field === "price") {
+        const amt = parseFloat(String($("#cAmt", sh).value).replace(/,/g, ""));
+        if ($("#cFree", sh).checked) value = JSON.stringify({ free: true }); else if (amt > 0) value = JSON.stringify({ amount: amt, cur: $("#cCur", sh).value }); else return toast("Tick free or enter an amount");
+      } else if (field === "look") { value = st.look; if (!value) return toast("Pick one"); }
+      else if (field === "kind") { if (!st.kind.size) return toast("Pick at least one"); value = JSON.stringify(Array.from(st.kind)); }
+      else if (field === "pay") { if (!st.pay.size) return toast("Pick at least one"); value = JSON.stringify(Array.from(st.pay)); }
+      else { value = $("#cVal", sh).value.trim(); if (field === "closed") value = value || "Reported closed"; }
       if (!value) return toast("Enter the correct value");
       if (field === "temp_c" && (isNaN(Number(value)) || Number(value) < -5 || Number(value) > 120)) return toast("Enter a temperature in °C");
+      if (id === SAMPLE_ID) return toast("Sample Spring: nothing is saved here.");
       S.edits.push({ id: uid(), spring: id, field, value, user: me.id, handle: me.handle, confirm: [], date: new Date().toISOString() });
-      save("edits"); rebuild(); refreshMarkers(); toast("Thanks, correction sent"); openSpring(id, false);
+      save("edits"); rebuild(); refreshMarkers(); toast(CONFIG.confirmThreshold > 1 ? "Thanks. It shows once another visitor agrees." : "Thanks, correction sent"); openSpring(id, false);
     };
   });
 }
@@ -853,7 +897,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121q").then(r => r.json()), fetch("data/notes.json?v=20261121q").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121s").then(r => r.json()), fetch("data/notes.json?v=20261121s").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();

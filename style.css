@@ -173,3 +173,6 @@ details.country .regions{padding:0 14px 12px}
 .tile{min-height:0}
 
 .facts .fact:last-child:nth-child(odd){grid-column:1/-1}
+
+.warnbox.pend{background:#fff1ea;border-color:#f0b49b}
+.pendtag{color:var(--coral-d);font-weight:700}
