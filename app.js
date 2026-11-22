@@ -653,7 +653,7 @@ function renderMe() {
 /* ---------- about ---------- */
 function renderAbout() {
   $("#about").innerHTML = `
-    <h1>About Thermal Waters of the World</h1>
+    <h1 style="font-family:Fraunces,Georgia,serif;font-weight:600;color:var(--teal-d)">About Thermal Waters of the World</h1>
     <p>A free, growing reference to the natural thermal springs of the world: hot or cold, wild in the hills, at a hotel, or behind a ticket desk. Treated spa water and swimming pools are not on the map.</p>
     <h2>The scale</h2>
     <div class="catlist">${CATS.map(c => `<div class="card"><b><i class="dot" style="background:${c.color};margin:0"></i>${c.id}. ${esc(c.name)}</b><span class="muted">${esc(c.line)}</span></div>`).join("")}</div>

@@ -15,7 +15,8 @@ button{cursor:pointer}
 .muted{color:var(--muted)}
 .top{position:sticky;top:0;z-index:1200;display:flex;align-items:center;gap:14px;padding:8px 16px;background:#fff;border-bottom:1px solid var(--line);min-height:var(--head)}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font-weight:800;white-space:nowrap}
-.brand small{font-weight:500;color:var(--muted)}
+@font-face{font-family:"Fraunces";font-style:normal;font-weight:600;font-display:swap;src:url(vendor/fraunces-600.woff2) format("woff2")}
+.brand .name{font-family:"Fraunces",Georgia,"Times New Roman",serif;font-weight:600;font-size:20px;letter-spacing:.2px;color:var(--teal-d)}
 .searchbox{position:relative;flex:1;max-width:420px}
 .searchbox input{width:100%;padding:9px 14px;border:1px solid var(--line);border-radius:999px;background:var(--bg)}
 .searchbox input:focus{outline:2px solid var(--teal);background:#fff}
@@ -104,7 +105,7 @@ details.country .regions{padding:0 14px 12px}
 .pop button{margin-top:6px}
 @media (max-width:820px){
   .top{flex-wrap:wrap;gap:8px}
-  .brand small{display:none}
+  .brand .name{font-size:17px}
   .searchbox{order:3;flex-basis:100%;max-width:none}
   .tabs{order:2;margin-left:auto}
   .tabs button{padding:7px 10px}
