@@ -124,3 +124,13 @@ details.country .regions{padding:0 14px 12px}
 .tag.ok{background:#e6f6ee;color:#0f7a4a;border-color:#a8dcc3}
 .warntxt{color:#b45309;font-weight:600}
 .warnbox{background:#fff8ec;border:1px solid #f3c98b;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:14px}
+
+.meas{margin:12px 0 14px}
+.mh{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.mh span{font-weight:600}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:5px 0 3px}
+.seg i{height:9px;border-radius:5px;background:var(--line)}
+.seg i.on{background:var(--teal)}
+.segl{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:12px;color:var(--muted)}
+.segl span:nth-child(2){text-align:center}.segl span:nth-child(3){text-align:right}
+.segl span.on{color:var(--teal-d);font-weight:700}

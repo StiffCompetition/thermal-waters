@@ -28,13 +28,19 @@ const CRITERIA = [
   { id: "access", label: "Getting there", help: "On foot, public transport or by road", opts: ["Hard trek", "Doable", "Walk up"] },
   { id: "facil", label: "Facilities", help: "Changing rooms, toilets, showers, staff", opts: ["None", "Basics", "Full"] },
   { id: "clean", label: "Cleanliness", help: "The site: litter, changing areas, banks", opts: ["Grubby", "Fine", "Spotless"] },
-  { id: "cost", label: "Cost", help: "Value for money", opts: ["Pricey", "Fair", "Free or cheap"] },
   { id: "worth", label: "Worth the trip", help: "Would you go again?", opts: ["Never again", "Maybe", "Definitely"] }
 ];
 /* Descriptors: shown and searchable, never scored */
 const WATER_LOOK = ["Clear", "Milky blue", "Cloudy", "Muddy"];
 const WATER_KIND = ["Sulphur", "Iron-rich", "Salty", "Fizzy", "Plain mineral"];
-const PAY = ["Free", "Cash only", "Card", "QR or bank transfer", "Pay in advance online"];
+const PAY = ["Cash only", "Card", "QR or bank transfer", "Pay in advance online"];
+/* entry price is a fact, never scored: the amount is typed in a currency that defaults to the spring's country */
+const EUR_C = ["Spain", "Italy", "France", "Germany", "Greece", "Slovakia", "Portugal", "Austria", "Slovenia", "Croatia", "Luxembourg", "Belgium"];
+const CUR_OF = { "United States": "USD", Japan: "JPY", Russia: "RUB", Chile: "CLP", Turkey: "TRY", Taiwan: "TWD", Canada: "CAD", "South Korea": "KRW", Iceland: "ISK", Algeria: "DZD", "New Zealand": "NZD", Mexico: "MXN", Tunisia: "TND", Iran: "IRR", India: "INR", Peru: "PEN", Colombia: "COP", "Czech Republic": "CZK", Hungary: "HUF", Indonesia: "IDR", "People's Republic of China": "CNY", China: "CNY", Uruguay: "UYU", Bolivia: "BOB", Australia: "AUD", Argentina: "ARS", Egypt: "EGP", "United Kingdom": "GBP", Thailand: "THB", Malaysia: "MYR", Poland: "PLN", Switzerland: "CHF", "Costa Rica": "CRC", Uganda: "UGX", Brazil: "BRL", Zimbabwe: "USD", Israel: "ILS", Ecuador: "USD", Zambia: "ZMW", Vietnam: "VND", Oman: "OMR", Mongolia: "MNT", Romania: "RON", Serbia: "RSD", Kazakhstan: "KZT", "South Africa": "ZAR", Morocco: "MAD", Bulgaria: "BGN", Philippines: "PHP", Ukraine: "UAH", Jordan: "JOD", Albania: "ALL", "Sri Lanka": "LKR", Panama: "USD", Nicaragua: "NIO", Venezuela: "VES", Pakistan: "PKR", Guatemala: "GTQ", Georgia: "GEL", Ethiopia: "ETB", Kenya: "KES", Jamaica: "JMD", Cuba: "CUP", Singapore: "SGD", "El Salvador": "USD", Honduras: "HNL", Ukraine2: "UAH", Armenia: "AMD", Fiji: "FJD", Tanzania: "TZS", Rwanda: "RWF", Madagascar: "MGA", Myanmar: "MMK", Azerbaijan: "AZN", Moldova: "MDL", "North Macedonia": "MKD", "Bosnia and Herzegovina": "BAM", Bhutan: "BTN", Kyrgyzstan: "KGS", Tajikistan: "TJS", "Saint Lucia": "XCD", Dominica: "XCD", Haiti: "HTG", Namibia: "NAD", "Papua New Guinea": "PGK", "United Arab Emirates": "AED", Iraq: "IQD", Greenland: "DKK" };
+EUR_C.forEach(c => CUR_OF[c] = "EUR");
+const curOf = s => CUR_OF[s.country] || "USD";
+const CUR_LIST = Array.from(new Set(Object.values(CUR_OF).concat(["USD", "EUR", "GBP"]))).sort();
+const money = (n, cur) => Number(n).toLocaleString("en-GB", { maximumFractionDigits: 2 }) + " " + cur;
 const TEMPS = ["Cold", "Warm", "Hot", "Very hot"];
 /* answers on the old 1 to 5 star scale are converted so earlier test ratings still count */
 function norm(r) {
@@ -56,13 +62,13 @@ const SAMPLE_ID = "sample-1";
 const sampleSvg = (sky, water, label) => "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="${sky}"/><circle cx="320" cy="60" r="28" fill="#ffe9a8"/><path d="M0 170 L90 110 L170 160 L260 95 L400 175 L400 300 L0 300Z" fill="#7b9a8a"/><ellipse cx="200" cy="225" rx="150" ry="52" fill="#d9d2c3"/><ellipse cx="200" cy="222" rx="132" ry="42" fill="${water}"/><g fill="#fff" opacity=".55"><circle cx="160" cy="205" r="9"/><circle cx="215" cy="198" r="12"/><circle cx="250" cy="214" r="7"/></g><text x="200" y="285" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#16313a">${label}</text></svg>`);
 const SAMPLE = {
   reviews: [
-    ["Steamy-Sam", { access: 2, facil: 2, clean: 3, cost: 3, worth: 3 }, "Free, quiet and properly hot. A 20 minute walk from the car park.", "Clear", ["Sulphur"], ["Free"]],
-    ["Pool-Pete", { access: 3, facil: 2, clean: 2, cost: 3, worth: 2 }, "Went at sunrise and had it to ourselves.", "Clear", ["Sulphur"], ["Free"]],
-    ["Mia-in-Mud", { access: 2, facil: 1, clean: 2, cost: 3, worth: 2 }, "Bit of algae on the rocks. Take sandals.", "Cloudy", ["Sulphur", "Iron-rich"], ["Free"]],
-    ["Tubby-Tom", { access: 3, facil: 2, clean: 2, cost: 3, worth: 3 }, "Bus stops at the end of the lane.", "Clear", [], ["Free"]],
-    ["Lagoon-Lou", { access: 2, facil: 2, clean: 3, cost: 2, worth: 3 }, "Best soak of the whole trip. Small cash box by the hut.", "Milky blue", ["Sulphur"], ["Cash only"]],
-    ["Kettle-Kat", { access: 1, facil: 1, clean: 1, cost: 3, worth: 2 }, "Busy at weekends and the path is rough.", "Cloudy", [], ["Free"]]
-  ].map(([h, r, t, look, kinds, pay], i) => ({ spring: SAMPLE_ID, user: "sample-u" + i, handle: h, r, text: t, water: { look, kinds }, pay, date: "2026-11-0" + (i + 1) + "T10:00:00Z" })),
+    ["Steamy-Sam", { access: 2, facil: 2, clean: 3, worth: 3 }, "Free, quiet and properly hot. A 20 minute walk from the car park.", "Clear", ["Sulphur"], [], { free: true }],
+    ["Pool-Pete", { access: 3, facil: 2, clean: 2, worth: 2 }, "Went at sunrise and had it to ourselves.", "Clear", ["Sulphur"], [], { free: true }],
+    ["Mia-in-Mud", { access: 2, facil: 1, clean: 2, worth: 2 }, "Bit of algae on the rocks. Take sandals.", "Cloudy", ["Sulphur", "Iron-rich"], [], { free: true }],
+    ["Tubby-Tom", { access: 3, facil: 2, clean: 2, worth: 3 }, "Bus stops at the end of the lane.", "Clear", [], [], { free: true }],
+    ["Lagoon-Lou", { access: 2, facil: 2, clean: 3, worth: 3 }, "Best soak of the whole trip. Small cash box by the hut.", "Milky blue", ["Sulphur"], ["Cash only"], { amount: 2, cur: "USD" }],
+    ["Kettle-Kat", { access: 1, facil: 1, clean: 1, worth: 2 }, "Busy at weekends and the path is rough.", "Cloudy", [], [], { free: true }]
+  ].map(([h, r, t, look, kinds, pay, price], i) => ({ spring: SAMPLE_ID, user: "sample-u" + i, handle: h, r, text: t, water: { look, kinds }, pay, price, date: "2026-11-0" + (i + 1) + "T10:00:00Z" })),
   photos: [
     { kind: "pro", caption: "Dawn over the main pool", data: sampleSvg("#f6c9a0", "#7fd0d6", "Dawn over the main pool"), terms: true },
     { kind: "snap", caption: "Our towels on the rocks", data: sampleSvg("#bfe3f0", "#5bbcc7", "Our towels on the rocks"), terms: false },
@@ -86,7 +92,7 @@ function profile() {
 }
 
 /* ---------- state ---------- */
-const blankFilters = q => ({ q, cats: new Set(), country: "", temp: "", minRating: 0, photos: false, mine: "", kind: "", pay: "" });
+const blankFilters = q => ({ q, cats: new Set(), country: "", temp: "", minRating: 0, photos: false, mine: "", kind: "", pay: "", price: "" });
 const S = {
   springs: [], byId: new Map(), notes: {},
   reviews: Store.get("reviews", []), photos: Store.get("photos", []), lists: Store.get("lists", { been: [], want: [] }),
@@ -284,17 +290,25 @@ function applyEdits(s) {
   o.look = a ? topKey(a.look) : "";
   o.kinds = a ? Object.keys(a.kinds).sort((x, z) => a.kinds[z] - a.kinds[x]) : [];
   o.pay = a ? Object.keys(a.pay).sort((x, z) => a.pay[z] - a.pay[x]) : [];
+  /* entry price: Free when most visitors said free, otherwise the typical (middle) amount in the most used currency */
+  o.price = ""; o.priceKind = "";
+  if (a) {
+    const cur = Object.keys(a.paid).sort((x, z) => a.paid[z].length - a.paid[x].length)[0], paidN = Object.values(a.paid).reduce((t, l) => t + l.length, 0);
+    if (a.free > paidN) { o.price = "Free"; o.priceKind = "Free"; }
+    else if (cur) { const l = a.paid[cur].slice().sort((x, z) => x - z); o.price = money(l[Math.floor(l.length / 2)], cur); o.priceKind = "Paid"; }
+  }
   return o;
 }
 function rebuild() {
   S.reviews = S.reviews.filter(r => r.spring !== SAMPLE_ID).concat(SAMPLE.reviews);
   S.photos = S.photos.filter(p => p.spring !== SAMPLE_ID).concat(SAMPLE.photos);
   S.agg = new Map();
-  S.reviews.forEach(r => { const a = S.agg.get(r.spring) || { n: 0, sum: {}, cnt: {}, look: {}, kinds: {}, pay: {} }, v = norm(r.r || {});
+  S.reviews.forEach(r => { const a = S.agg.get(r.spring) || { n: 0, sum: {}, cnt: {}, look: {}, kinds: {}, pay: {}, free: 0, paid: {} }, v = norm(r.r || {});
     a.n++; CRITERIA.forEach(c => { if (v[c.id]) { a.sum[c.id] = (a.sum[c.id] || 0) + v[c.id]; a.cnt[c.id] = (a.cnt[c.id] || 0) + 1; } });
     if (r.water && r.water.look) a.look[r.water.look] = (a.look[r.water.look] || 0) + 1;
     ((r.water && r.water.kinds) || []).forEach(k => a.kinds[k] = (a.kinds[k] || 0) + 1);
     (r.pay || []).forEach(k => a.pay[k] = (a.pay[k] || 0) + 1);
+    if (r.price && r.price.free) a.free++; else if (r.price && r.price.amount > 0) (a.paid[r.price.cur] = a.paid[r.price.cur] || []).push(Number(r.price.amount));
     S.agg.set(r.spring, a); });
   const all = S.springs_base.concat(S.added.map(a => Object.assign({ src: "Community", userAdded: true }, a)));
   S.springs = all.map(applyEdits);
@@ -318,11 +332,12 @@ function passes(s) {
   if (f.minRating) { const r = rating(s.id); if (!r || r.overall < f.minRating) return false; }
   if (f.kind && !(s.kinds || []).includes(f.kind)) return false;
   if (f.pay && !(s.pay || []).includes(f.pay)) return false;
+  if (f.price && s.priceKind !== f.price) return false;
   if (f.photos && !S.photoCount.get(s.id)) return false;
   if (f.mine) { const l = S.lists[f.mine] || []; if (!l.includes(s.id)) return false; }
   return true;
 }
-const activeFilters = () => (S.f.cats.size ? 1 : 0) + (S.f.country ? 1 : 0) + (S.f.temp ? 1 : 0) + (S.f.minRating ? 1 : 0) + (S.f.kind ? 1 : 0) + (S.f.pay ? 1 : 0) + (S.f.photos ? 1 : 0) + (S.f.mine ? 1 : 0);
+const activeFilters = () => (S.f.cats.size ? 1 : 0) + (S.f.country ? 1 : 0) + (S.f.temp ? 1 : 0) + (S.f.minRating ? 1 : 0) + (S.f.kind ? 1 : 0) + (S.f.pay ? 1 : 0) + (S.f.price ? 1 : 0) + (S.f.photos ? 1 : 0) + (S.f.mine ? 1 : 0);
 
 /* ---------- map ---------- */
 function initMap() {
@@ -411,14 +426,15 @@ function openFilters() {
     <label class="field"><span>Score</span><select id="fRate">${[0, 5, 6, 7, 8, 9].map(n => `<option value="${n}" ${S.f.minRating === n ? "selected" : ""}>${n ? n + " out of 10 and up" : "Any"}</option>`).join("")}</select></label>
     <label class="field"><span>Water temperature</span><select id="fTemp">${["", ...TEMPS].map(t => `<option value="${t}" ${S.f.temp === t ? "selected" : ""}>${t || "Any"}${t === "Cold" ? " (under 20°C)" : t === "Warm" ? " (20 to 36°C)" : t === "Hot" ? " (37 to 44°C)" : t === "Very hot" ? " (45°C and over)" : ""}</option>`).join("")}</select></label>
     ${sel("fKind", "Water kind", WATER_KIND, S.f.kind)}
-    ${sel("fPay", "Payment", PAY, S.f.pay)}
+    ${sel("fPrice", "Entry price", ["Free", "Paid"], S.f.price)}
+    ${sel("fPay", "How to pay", PAY, S.f.pay)}
     <label class="field"><span>Country</span><select id="fCountry"><option value="">All countries</option>${countries.map(c => `<option ${S.f.country === c ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
     <label class="field"><span><input type="checkbox" id="fPhotos" ${S.f.photos ? "checked" : ""} style="width:auto"> Has photos</span></label>
     <label class="field"><span>Only my lists</span><select id="fMine"><option value="">All springs</option><option value="been" ${S.f.mine === "been" ? "selected" : ""}>Places I have been</option><option value="want" ${S.f.mine === "want" ? "selected" : ""}>Places I want to go</option></select></label>
     <div class="row"><button class="btn" id="fApply">Show springs</button><button class="btn ghost" id="fClear">Clear all</button></div>
     <p class="muted">A spring gets its type, score, water and payment details from visitor ratings, so springs nobody has rated yet only show under "Not yet classified" and "Any".</p>`, sh => {
     $$("[data-fc]", sh).forEach(b => b.onclick = () => { const id = Number(b.dataset.fc); S.f.cats.has(id) ? S.f.cats.delete(id) : S.f.cats.add(id); b.classList.toggle("on"); });
-    $("#fApply", sh).onclick = () => { S.f.country = $("#fCountry").value; S.f.temp = $("#fTemp").value; S.f.minRating = Number($("#fRate").value); S.f.kind = $("#fKind").value; S.f.pay = $("#fPay").value; S.f.photos = $("#fPhotos").checked; S.f.mine = $("#fMine").value; closeSheet(); refreshMarkers(); renderDir(); };
+    $("#fApply", sh).onclick = () => { S.f.country = $("#fCountry").value; S.f.temp = $("#fTemp").value; S.f.minRating = Number($("#fRate").value); S.f.kind = $("#fKind").value; S.f.pay = $("#fPay").value; S.f.price = $("#fPrice").value; S.f.photos = $("#fPhotos").checked; S.f.mine = $("#fMine").value; closeSheet(); refreshMarkers(); renderDir(); };
     $("#fClear", sh).onclick = () => { S.f = blankFilters(S.f.q); closeSheet(); refreshMarkers(); renderDir(); };
   });
 }
@@ -437,7 +453,8 @@ function openSpring(id, push = true) {
   const facts = [
     ["Temperature", s.temp_c != null ? `${s.temp_c}°C · ${tempClass(s.temp_c)}` : "Not recorded"],
     ["Water", [s.look].concat(s.kinds || []).filter(Boolean).join(" · ") || "Not yet described"],
-    ["Payment", (s.pay || []).join(" · ") || "Not yet described"],
+    ["Entry price", s.price || "Not yet described"],
+    ["How to pay", (s.pay || []).join(" · ") || "Not yet described"],
     ["Where", [s.region, s.country].filter(Boolean).join(", ") || "Unknown"],
     ["Position", s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + (isApprox(s) ? " (approximate)" : s.posConfirmed ? " (confirmed)" : "")]
   ];
@@ -458,10 +475,13 @@ function openSpring(id, push = true) {
     ${s.accessNote ? `<p><b>Getting there:</b> ${esc(s.accessNote)}</p>` : ""}${s.costNote ? `<p><b>Cost:</b> ${esc(s.costNote)}</p>` : ""}
     <h3>Visitor score</h3>
     ${r ? `<p><span class="bigscore">${r.overall.toFixed(1)}</span><span class="muted"> out of 10 from ${r.n} visit${r.n > 1 ? "s" : ""}</span></p>
-      ${CRITERIA.map(cr => r.per[cr.id] ? `<div class="crit"><span>${cr.label}</span><div class="bar"><i style="width:${(r.per[cr.id] / 3) * 100}%"></i></div><b>${esc(answerWord(cr, r.per[cr.id]))}</b></div>` : `<div class="crit"><span>${cr.label}</span><span class="muted">No answers yet</span><span></span></div>`).join("")}`
+      ${CRITERIA.map(cr => { const v = r.per[cr.id], k = v ? Math.round(v) : 0;
+        return `<div class="meas"><div class="mh"><span>${cr.label}</span><b>${v ? esc(cr.opts[k - 1]) : "No answers yet"}</b></div>
+        <div class="seg">${[1, 2, 3].map(n => `<i class="${n <= k ? "on" : ""}"></i>`).join("")}</div>
+        <div class="segl">${cr.opts.map((o, i) => `<span class="${i + 1 === k ? "on" : ""}">${esc(o)}</span>`).join("")}</div></div>`; }).join("")}`
       : `<p class="muted">No ratings yet.</p>`}
     <button class="btn" data-act="review">${revs.some(x => x.user === me.id) ? "Update my rating" : "Rate this spring"}</button>
-    ${revs.filter(x => x.text).map(x => { const v = norm(x.r || {}); return `<div class="card" style="margin-top:10px"><b>${esc(x.handle)}</b> ${v.worth ? `<span class="tag">${esc(answerWord(CRITERIA[4], v.worth))}</span>` : ""}<br>${esc(x.text)}<br><small class="muted">${new Date(x.date).toLocaleDateString("en-GB")}</small></div>`; }).join("")}
+    ${revs.filter(x => x.text).map(x => { const v = norm(x.r || {}); return `<div class="card" style="margin-top:10px"><b>${esc(x.handle)}</b> ${v.worth ? `<span class="tag">${esc(answerWord(CRITERIA.find(c => c.id === "worth"), v.worth))}</span>` : ""}<br>${esc(x.text)}<br><small class="muted">${new Date(x.date).toLocaleDateString("en-GB")}</small></div>`; }).join("")}
     <h3 style="margin-top:18px">Photos (${phs.length})</h3>
     ${phs.length ? `<div class="photos">${phs.map((p, i) => `<img src="${p.data}" alt="${esc(p.caption || s.name)}" data-ph="${i}" loading="lazy">`).join("")}</div>` : `<p class="muted">No photos yet.</p>`}
     <p><button class="btn ghost sm" data-act="photo">Add a photo</button></p>
@@ -517,6 +537,9 @@ function openReview(id) {
   openSheet("Rate " + s.name, `
     ${CRITERIA.map(c => `<div class="field" data-crit="${c.id}"><span>${c.label}</span><small class="muted">${c.help}</small>
       <div class="pills">${c.opts.map((o, i) => `<button type="button" data-v="${i + 1}" class="${val[c.id] === i + 1 ? "on" : ""}">${esc(o)}</button>`).join("")}</div></div>`).join("")}
+    <div class="field"><span>Entry price (optional)</span><small class="muted">What you paid to get in, in the currency you paid</small>
+      <label style="font-weight:400"><input type="checkbox" id="pFree" ${prev && prev.price && prev.price.free ? "checked" : ""} style="width:auto"> It was free</label>
+      <div class="row" id="pRow"><input id="pAmt" inputmode="decimal" placeholder="Amount" value="${prev && prev.price && prev.price.amount ? esc(prev.price.amount) : ""}" style="flex:1;min-width:90px;padding:9px 10px;border:1px solid var(--line);border-radius:10px"><select id="pCur" style="padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff">${CUR_LIST.map(c => `<option ${c === ((prev && prev.price && prev.price.cur) || curOf(s)) ? "selected" : ""}>${c}</option>`).join("")}</select></div></div>
     <div class="field"><span>The water (optional)</span><small class="muted">What it looks like</small><div class="row" id="wLook">${chips("look", WATER_LOOK, o => water.look === o)}</div>
       <small class="muted">What it is (tick any)</small><div class="row" id="wKind">${chips("kind", WATER_KIND, o => water.kinds.has(o))}</div></div>
     <div class="field"><span>How you pay (optional, tick any)</span><div class="row" id="wPay">${chips("pay", PAY, o => pay.has(o))}</div></div>
@@ -527,13 +550,16 @@ function openReview(id) {
     $$("[data-look]", sh).forEach(b => b.onclick = () => { water.look = water.look === b.dataset.look ? "" : b.dataset.look; $$("[data-look]", sh).forEach(x => x.classList.toggle("on", x.dataset.look === water.look)); });
     $$("[data-kind]", sh).forEach(b => b.onclick = () => { const k = b.dataset.kind; water.kinds.has(k) ? water.kinds.delete(k) : water.kinds.add(k); b.classList.toggle("on"); });
     $$("[data-pay]", sh).forEach(b => b.onclick = () => { const k = b.dataset.pay; pay.has(k) ? pay.delete(k) : pay.add(k); b.classList.toggle("on"); });
+    const syncFree = () => { $("#pAmt", sh).disabled = $("#pCur", sh).disabled = $("#pFree", sh).checked; };
+    $("#pFree", sh).onchange = syncFree; syncFree();
     $("#rBack", sh).onclick = () => openSpring(id, false);
     $("#rSave", sh).onclick = () => {
       const need = CRITERIA.find(c => !val[c.id]);
       if (need) return toast("Please answer: " + need.label);
       if (id === SAMPLE_ID) return toast("This is an example spring, so nothing is saved. Rate a real spring.");
       S.reviews = S.reviews.filter(x => !(x.spring === id && x.user === me.id));
-      S.reviews.push({ spring: id, user: me.id, handle: me.handle, r: Object.assign({}, val), water: { look: water.look, kinds: Array.from(water.kinds) }, pay: Array.from(pay), text: $("#rText", sh).value.trim(), date: new Date().toISOString() });
+      const amt = parseFloat(String($("#pAmt", sh).value).replace(/,/g, "")), price = $("#pFree", sh).checked ? { free: true } : amt > 0 ? { amount: amt, cur: $("#pCur", sh).value } : null;
+      S.reviews.push({ spring: id, user: me.id, handle: me.handle, price, r: Object.assign({}, val), water: { look: water.look, kinds: Array.from(water.kinds) }, pay: Array.from(pay), text: $("#rText", sh).value.trim(), date: new Date().toISOString() });
       save("reviews"); if (!S.lists.been.includes(id)) { S.lists.been.push(id); save("lists"); }
       rebuild(); refreshMarkers(); toast("Rating saved. Added to places you have been."); openSpring(id, false);
     };
@@ -721,8 +747,8 @@ function renderAbout() {
     <h2>The type scale</h2>
     <div class="catlist">${CATS.map(c => `<div class="card"><b><i class="dot" style="background:${c.color};margin:0"></i>${c.id}. ${esc(c.name)}</b><span class="muted">${esc(c.line)}</span></div>`).join("")}</div>
     <h2>How rating works</h2>
-    <p>Visitors answer five questions, each with three named answers: <b>Getting there</b> (Hard trek, Doable, Walk up), <b>Facilities</b> (None, Basics, Full), <b>Cleanliness</b> (Grubby, Fine, Spotless), <b>Cost</b> (Pricey, Fair, Free or cheap) and <b>Worth the trip</b> (Never again, Maybe, Definitely). The answers average into the score out of 10 shown on every spring.</p>
-    <p>The type above is worked out from the Getting there and Facilities answers, so nobody votes on it separately. Water look (Clear, Milky blue, Cloudy, Muddy), water kind (Sulphur, Iron-rich, Salty, Fizzy, Plain mineral) and how you pay (Free, Cash only, Card, QR or bank transfer, Pay in advance online) are shown and searchable but never scored.</p>
+    <p>Visitors answer four questions, each with three named answers: <b>Getting there</b> (Hard trek, Doable, Walk up), <b>Facilities</b> (None, Basics, Full), <b>Cleanliness</b> (Grubby, Fine, Spotless) and <b>Worth the trip</b> (Never again, Maybe, Definitely). The answers average into the score out of 10 shown on every spring.</p>
+    <p>The type above is worked out from the Getting there and Facilities answers, so nobody votes on it separately. Water look (Clear, Milky blue, Cloudy, Muddy), water kind (Sulphur, Iron-rich, Salty, Fizzy, Plain mineral) the entry price (typed in the local currency, or Free) and how you pay (Cash only, Card, QR or bank transfer, Pay in advance online) are shown and searchable but never scored.</p>
     <h2>Photos</h2>
     <p>Add holiday snaps for everyone to see. If you shoot professional-style pictures, you can agree to let them appear in the planned Thermal Waters of the World book.</p>
     <h2>Businesses</h2>
@@ -741,7 +767,8 @@ function initSearch() {
     CATS.forEach(c => { if (has(c.name, c.name)) out.push({ key: "type:" + c.id, label: c.name, sub: "Type" }); });
     TEMPS.forEach(t => { if (t.toLowerCase().startsWith(v)) out.push({ key: "temp:" + t, label: t + " water", sub: "Temperature" }); });
     WATER_KIND.forEach(k => { if (has(k, k)) out.push({ key: "kind:" + k, label: k, sub: "Water kind" }); });
-    PAY.forEach(k => { if (has(k, k)) out.push({ key: "pay:" + k, label: k, sub: "Payment" }); });
+    PAY.forEach(k => { if (has(k, k)) out.push({ key: "pay:" + k, label: k, sub: "How to pay" }); });
+    ["Free", "Paid"].forEach(k => { if (k.toLowerCase().startsWith(v)) out.push({ key: "price:" + k, label: k + " entry", sub: "Entry price" }); });
     const m = v.match(/^(?:score\s*)?(\d+(?:\.\d+)?)\s*(\+|and up|\/10)?$/);
     if (m && Number(m[1]) >= 1 && Number(m[1]) <= 10 && (m[2] || /^score/.test(v))) out.push({ key: "score:" + m[1], label: "Score " + m[1] + " out of 10 and up", sub: "Score" });
     if ("photos".startsWith(v) && v.length > 2) out.push({ key: "photos:1", label: "Has photos", sub: "Photos" });
@@ -760,7 +787,7 @@ function initSearch() {
     if (b.dataset.facet) {
       const [k, val] = [b.dataset.facet.split(":")[0], b.dataset.facet.slice(b.dataset.facet.indexOf(":") + 1)];
       S.f = blankFilters(""); 
-      if (k === "type") S.f.cats.add(Number(val)); else if (k === "temp") S.f.temp = val; else if (k === "kind") S.f.kind = val; else if (k === "pay") S.f.pay = val; else if (k === "score") S.f.minRating = Number(val); else if (k === "photos") S.f.photos = true;
+      if (k === "type") S.f.cats.add(Number(val)); else if (k === "temp") S.f.temp = val; else if (k === "kind") S.f.kind = val; else if (k === "pay") S.f.pay = val; else if (k === "price") S.f.price = val; else if (k === "score") S.f.minRating = Number(val); else if (k === "photos") S.f.photos = true;
       refreshMarkers(); renderDir(); setView("map"); q.value = b.querySelector("b").textContent;
       const pts = S.springs.filter(passes).map(s => [s.lat, s.lon]); if (pts.length && pts.length < 400) S.map.fitBounds(pts, { padding: [30, 30], maxZoom: 7 });
       toast(pts.length ? pts.length + " springs match. Open Filters to change." : "No springs match yet. Ratings fill these in.");
@@ -795,7 +822,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121d").then(r => r.json()), fetch("data/notes.json?v=20261121d").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121e").then(r => r.json()), fetch("data/notes.json?v=20261121e").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
