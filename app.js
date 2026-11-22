@@ -819,18 +819,56 @@ function renderAbout() {
   $("#about").innerHTML = `
     <h1 style="font-family:Fraunces,Georgia,serif;font-weight:600;color:var(--teal-d)">About Thermal Waters of the World</h1>
     <p>A free, growing reference to the natural thermal springs of the world: hot or cold, wild in the hills, at a hotel, or behind a ticket desk. Treated spa water and swimming pools are not on the map.</p>
-    <h2>The type scale</h2>
-    <div class="catlist">${CATS.map(c => `<div class="card"><b><i class="dot" style="background:${c.color};margin:0"></i>${c.id}. ${esc(c.name)}</b><span class="muted">${esc(c.line)}</span></div>`).join("")}</div>
-    <h2>How rating works</h2>
-    <p>Visitors answer four questions, each with three named answers: <b>Getting there</b> (Hard trek, Doable, Walk up), <b>Facilities</b> (None, Basics, Full), <b>Cleanliness</b> (Dirty, Passable, Spotless) and <b>Worth the trip</b> (Never again, Maybe, Definitely). The answers average into the score out of 10 shown on every spring, and each score has a name: <b>Hard pass</b> (under 4), <b>Fine if you're nearby</b> (4 to 5.9), <b>Proper good soak</b> (6 to 7.9) and <b>Unmissable</b> (8 and up).</p>
-    <p>The type above describes how easy the spring is to reach and what is on site, and is not a second score. It is worked out from the Getting there and Facilities answers, so nobody votes on it separately. Water look (Clear, Milky blue, Cloudy, Muddy), water kind (Sulphur, Iron-rich, Salty, Fizzy, Plain mineral) the entry price (typed in the local currency, or Free) and how you pay (Cash only, Card, QR or bank transfer, Pay in advance online) are shown and searchable but never scored.</p>
+    <p><a href="#how" data-nav="how"><b>How scoring works</b></a>: the four questions, the score names, the type scale and the unscored facts.</p>
     <h2>Photos</h2>
     <p>Add holiday snaps for everyone to see. If you shoot professional-style pictures, you can agree to let them appear in the planned Thermal Waters of the World book.</p>
     <h2>Businesses</h2>
     <p>Run a spring or a place beside one? Add a free basic listing from the spring's page. Adverts will cost a small monthly fee, announced at launch.</p>
     <h2>Where the data comes from</h2>
     <p>The starting directory is built from open public-domain and CC0 sources: Wikidata, the NOAA thermal springs list for the United States, and a small editorial set where those are thin (such as Colombia, positions approximate until visitors confirm them). Visitors then confirm, correct and extend it. Map tiles are provided by Esri.</p>
+    <p><a href="#terms" data-nav="terms"><b>Terms of use</b></a></p>
     <div class="note"><b>Test build.</b> Ratings, photos and corrections are shared by everyone. Accounts are anonymous; add an email on the My springs tab to keep yours on any device.</div>`;
+}
+
+/* ---------- how scoring works ---------- */
+function renderHow() {
+  const helpTxt = { access: "How hard the spring is to reach.", facil: "What is on site: changing rooms, toilets, showers, staff.", clean: "How clean the site is: litter, changing areas, banks.", worth: "Whether you would make the trip again." };
+  $("#how").innerHTML = `
+    <h1 style="font-family:Fraunces,Georgia,serif;font-weight:600;color:var(--teal-d)">How scoring works</h1>
+    <h2>Four questions</h2>
+    <p>Every visitor answers the same four questions, each with three named answers.</p>
+    <div class="catlist">${CRITERIA.map(c => `<div class="card"><b>${esc(c.label)}</b><span class="muted">${esc(helpTxt[c.id])}</span><div style="margin-top:6px">${c.opts.map(o => `<span class="tag">${esc(o)}</span>`).join(" ")}</div></div>`).join("")}</div>
+    <h2>The score out of 10</h2>
+    <p>The answers from all visitors are averaged into one score out of 10, and every score has a name.</p>
+    <div class="catlist">${[["8 and up", "Unmissable"], ["6 to 7.9", "Proper good soak"], ["4 to 5.9", "Fine if you're nearby"], ["Under 4", "Hard pass"]].map(b => `<div class="card"><b>${esc(b[1])}</b><span class="muted">${b[0]}</span></div>`).join("")}</div>
+    <h2>The type scale</h2>
+    <p>The type says how easy a spring is to reach and what is on site. It is worked out from the Getting there and Facilities answers, nobody votes on it, and it is not a second score.</p>
+    <div class="catlist">${CATS.map(c => `<div class="card"><b><i class="dot" style="background:${c.color};margin:0"></i>${c.id}. ${esc(c.name)}</b><span class="muted">${esc(c.plain)}</span></div>`).join("")}</div>
+    <h2>Facts that are not scored</h2>
+    <p><b>Water look</b> (${WATER_LOOK.join(", ")}), <b>water kind</b> (${WATER_KIND.join(", ")}), <b>entry price</b> (Free, or an amount in the local currency) and <b>how to pay</b> (${PAY.join(", ")}). They are shown and searchable but never part of the score. How to pay shows only when entry is paid.</p>
+    <h2>Corrections</h2>
+    <p>Anyone can suggest a correction to a spring's details. It shows once a second visitor agrees, and until then the current details stay with a notice that a correction is waiting. New pin positions are checked automatically against the current pin.</p>
+    <p><a href="#about" data-nav="about">About</a> · <a href="#terms" data-nav="terms">Terms of use</a></p>`;
+}
+
+/* ---------- terms of use ---------- */
+function renderTerms() {
+  $("#terms").innerHTML = `
+    <h1 style="font-family:Fraunces,Georgia,serif;font-weight:600;color:var(--teal-d)">Terms of use</h1>
+    <div class="note"><b>Draft.</b> Plain-English working terms for the test build. They are checked by a lawyer before launch.</div>
+    <h2>Visiting a spring</h2>
+    <p>Everything here is supplied by visitors and public sources. Temperatures, directions, prices, opening and pin positions can be wrong or out of date, and natural water can be hot enough to burn, with strong currents and slippery ground. Check locally before you travel. You visit at your own risk.</p>
+    <h2>What you post</h2>
+    <p>Ratings, words, corrections, listings and photos are public. Post only what is yours or true to your knowledge. You keep ownership of what you post and give the site permission to show it, and to keep showing it in the site's totals. Content that is abusive, false, spam or unlawful can be removed.</p>
+    <h2>Photos</h2>
+    <p>Add only photos you took yourself. A photo you add shows on the spring page. If you tick the professional-style option, you also agree that it may appear in the planned Thermal Waters of the World book. You can remove your own photos.</p>
+    <h2>Accounts and your data</h2>
+    <p>Accounts are anonymous: you pick a handle, and only the handle is shown. An email address is used only to send your sign-in link so your lists and posts follow you to another device. Your data is stored in the site's shared database. On the My springs tab you can erase your account, lists, ratings and photos.</p>
+    <h2>Businesses and adverts</h2>
+    <p>A basic listing for a spring or a place beside one is free. Adverts will cost a small monthly fee, announced at launch.</p>
+    <h2>Sources</h2>
+    <p>The starting directory is built from open public-domain and CC0 sources (Wikidata, the NOAA thermal springs list) and a small editorial set. Map tiles are provided by Esri.</p>
+    <p><a href="#about" data-nav="about">About</a> · <a href="#how" data-nav="how">How scoring works</a></p>`;
 }
 
 /* ---------- search ---------- */
@@ -876,14 +914,14 @@ function initSearch() {
 function setView(v) {
   S.view = v; $$(".view").forEach(x => x.classList.toggle("on", x.id === "view-" + v)); $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.nav === v));
   if (v === "map" && S.map) setTimeout(() => S.map.invalidateSize(), 50);
-  if (v === "directory") renderDir(); if (v === "me") renderMe(); if (v === "about") renderAbout();
+  if (v === "directory") renderDir(); if (v === "me") renderMe(); if (v === "about") renderAbout(); if (v === "how") renderHow(); if (v === "terms") renderTerms();
   if (!location.hash.startsWith("#spring=")) history.replaceState(null, "", "#" + v);
   window.scrollTo(0, 0);
 }
 function route() {
   const h = location.hash.slice(1);
   if (h.startsWith("spring=")) { const id = decodeURIComponent(h.slice(7)); const s = S.byId.get(id); if (s) { setView("map"); S.map.setView([s.lat, s.lon], 11); openSpring(id, false); } }
-  else if (["map", "directory", "me", "about"].includes(h)) setView(h);
+  else if (["map", "directory", "me", "about", "how", "terms"].includes(h)) setView(h);
 }
 
 document.addEventListener("click", e => {
@@ -897,7 +935,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121s").then(r => r.json()), fetch("data/notes.json?v=20261121s").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121u").then(r => r.json()), fetch("data/notes.json?v=20261121u").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
