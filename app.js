@@ -13,13 +13,13 @@ const CONFIG = {
 };
 
 const CATS = [
-  { id: 1, name: "Properly Wild", line: "Hike in, no facilities, bring your own towel and nerve.", color: "#2e7d32" },
-  { id: 2, name: "Roadside Dip", line: "Free, easy to reach, nothing but the water.", color: "#7cb342" },
-  { id: 3, name: "Mum Could Walk It", line: "Short stroll, tidy path, maybe a bench and a bin.", color: "#f9a825" },
-  { id: 4, name: "Towel Provided", line: "Paid entry, changing rooms, a cafe nearby.", color: "#ef6c00" },
-  { id: 5, name: "Robe and Slippers", line: "Hotel or resort level, with a hot chocolate waiting.", color: "#8e24aa" }
+  { id: 1, name: "Properly Wild", plain: "Hike in, no facilities.", line: "Hike in, no facilities, bring your own towel and nerve.", color: "#2e7d32" },
+  { id: 2, name: "Roadside Dip", plain: "Easy to reach, no facilities.", line: "Free, easy to reach, nothing but the water.", color: "#7cb342" },
+  { id: 3, name: "Mum Could Walk It", plain: "Short easy walk, basic facilities.", line: "Short stroll, tidy path, maybe a bench and a bin.", color: "#f9a825" },
+  { id: 4, name: "Towel Provided", plain: "Changing rooms and a cafe nearby.", line: "Paid entry, changing rooms, a cafe nearby.", color: "#ef6c00" },
+  { id: 5, name: "Robe and Slippers", plain: "Hotel or resort level, full facilities.", line: "Hotel or resort level, with a hot chocolate waiting.", color: "#8e24aa" }
 ];
-const NOCAT = { id: 0, name: "Not yet classified", line: "Rate Getting there and Facilities and this spring lands on the scale.", color: "#78909c" };
+const NOCAT = { id: 0, name: "Not yet classified", plain: "Not yet rated.", line: "Rate Getting there and Facilities and this spring lands on the scale.", color: "#78909c" };
 const catOf = id => CATS.find(c => c.id === Number(id)) || NOCAT;
 
 /* Five measures, three named answers each (1, 2, 3). They roll up into the score out of 10;
@@ -440,6 +440,16 @@ function openFilters() {
 }
 
 /* ---------- spring page ---------- */
+/* a description every spring gets automatically, from the facts known so far */
+function describe(s) {
+  const c = catOf(s.cat), kinds = (s.kinds || []).map(k => k.toLowerCase()).join(", ");
+  const where = [s.region, s.country].filter(Boolean).join(", ");
+  let t = "A " + (s.temp_c != null ? tempClass(s.temp_c).toLowerCase() + " (" + s.temp_c + "°C) " : "") + (kinds ? kinds + " " : "") + "spring" + (where ? " in " + where : "") + ".";
+  if (s.look) t += " The water is " + s.look.toLowerCase() + ".";
+  if (s.cat) t += " " + c.plain;
+  if (s.priceKind === "Free") t += " Free entry."; else if (s.priceKind === "Paid") t += " Entry about " + s.price + ".";
+  return t;
+}
 function openSpring(id, push = true) {
   const s = S.byId.get(id); if (!s) return;
   if (push) history.replaceState(null, "", "#spring=" + encodeURIComponent(id));
@@ -450,19 +460,28 @@ function openSpring(id, push = true) {
   const eds = S.edits.filter(e => e.spring === id && !e.rejected);
   const lst = S.listings.filter(l => l.spring === id);
   const note = S.notes[id];
+  /* main photo: the first professional-style photo, otherwise the first holiday snap */
+  const hero = phs.filter(p => p.kind === "pro").sort((a, z) => String(a.date).localeCompare(String(z.date)))[0] || phs.slice().sort((a, z) => String(a.date).localeCompare(String(z.date)))[0] || null;
   const facts = [
-    ["Temperature", s.temp_c != null ? `${s.temp_c}°C · ${tempClass(s.temp_c)}` : "Not recorded"],
     ["Water", [s.look].concat(s.kinds || []).filter(Boolean).join(" · ") || "Not yet described"],
-    ["Entry price", s.price || "Not yet described"],
     ["How to pay", (s.pay || []).join(" · ") || "Not yet described"],
     ["Where", [s.region, s.country].filter(Boolean).join(", ") || "Unknown"],
     ["Position", s.lat.toFixed(4) + ", " + s.lon.toFixed(4) + (isApprox(s) ? " (approximate)" : s.posConfirmed ? " (confirmed)" : "")]
   ];
   const html = `
-    <h2 style="margin-bottom:4px">${esc(s.name)}</h2>${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
-    <div class="row"><span class="chip"><i style="background:${c.color}"></i>${esc(c.name)}</span>
-      ${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
-    <p class="muted" style="margin:6px 0">${esc(c.line)}${r && r.overall ? ` <b style="color:var(--teal-d)">Score ${r.overall.toFixed(1)}/10</b>` : ""}</p>
+    <div class="hero" style="--tc:${c.color}">
+      ${hero ? `<img src="${hero.data}" alt="${esc(hero.caption || s.name)}" data-ph="${phs.indexOf(hero)}">` : `<div class="heropanel"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M60 14C60 14 28 50 28 74a32 32 0 0 0 64 0C92 50 60 14 60 14z" fill="#fff" opacity=".35"/><path d="M30 100c10-8 20-8 30 0s20 8 30 0" stroke="#fff" stroke-width="5" fill="none" opacity=".5" stroke-linecap="round"/></svg></div>`}
+      <div class="herotag"><b>${esc(c.name)}</b><span>${esc(c.plain)}</span></div>
+    </div>
+    <h2 style="margin:12px 0 2px">${esc(s.name)}</h2>${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
+    <div class="row">${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
+    <div class="tiles" style="--tc:${c.color}">
+      <div class="tile"><small>Score</small><b>${r && r.overall ? r.overall.toFixed(1) + "<i>/10</i>" : "–"}</b></div>
+      <div class="tile"><small>Temperature</small><b>${s.temp_c != null ? s.temp_c + "°C" : "–"}</b><em>${s.temp_c != null ? tempClass(s.temp_c) : "Not recorded"}</em></div>
+      <div class="tile"><small>Entry price</small><b>${esc(s.price || "–")}</b></div>
+      <div class="tile"><small>Getting there</small><b>${r && r.per.access ? esc(CRITERIA[0].opts[Math.round(r.per.access) - 1]) : "–"}</b></div>
+    </div>
+    <p class="desc">${esc(describe(s))}</p>
     ${isApprox(s) ? `<div class="warnbox"><b>Approximate position.</b> This pin marks the nearest town, not the spring itself. Ask locally or check before you travel. Know the exact spot? <button class="btn sm" data-act="locate">Update location</button></div>` : ""}
     <div class="row">
       <button class="btn sm ${been ? "on" : "ghost"}" data-list="been">${been ? "✓ Been here" : "I have been here"}</button>
@@ -822,7 +841,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121e").then(r => r.json()), fetch("data/notes.json?v=20261121e").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121f").then(r => r.json()), fetch("data/notes.json?v=20261121f").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
