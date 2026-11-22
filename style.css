@@ -166,3 +166,8 @@ details.country .regions{padding:0 14px 12px}
 .acts .btn{padding:8px 4px;font-size:13px;white-space:nowrap;text-align:center;border-radius:10px}
 .acts .btn.on{background:var(--gold);border-color:var(--gold);color:#3b2a00}
 .hero{box-shadow:0 6px 18px rgba(232,104,58,.22)}
+
+.tile b i{font-family:system-ui,sans-serif;font-size:14px;font-weight:600;margin-left:2px}
+.tile{min-height:0}
+
+.facts .fact:last-child:nth-child(odd){grid-column:1/-1}
