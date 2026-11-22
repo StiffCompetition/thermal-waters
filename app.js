@@ -504,7 +504,10 @@ function openSpring(id, push = true) {
     ${note ? `<div class="writer"><b>From the writer</b><br>${esc(note.text)}</div>` : ""}
     <div class="facts">${facts.map(f => `<div class="fact"><small>${f[0]}</small><b>${esc(f[1])}</b></div>`).join("")}</div>
     ${s.accessNote ? `<p><b>Getting there:</b> ${esc(s.accessNote)}</p>` : ""}${s.costNote ? `<p><b>Cost:</b> ${esc(s.costNote)}</p>` : ""}
-    <h3>Visitor ratings${r ? ` <small class="muted" style="font-weight:400">· ${r.n} visit${r.n > 1 ? "s" : ""}</small>` : ""}</h3>
+    <h3>Photos (${phs.length})</h3>
+    ${phs.length ? `<div class="photos">${phs.map((p, i) => `<img src="${p.data}" alt="${esc(p.caption || s.name)}" data-ph="${i}" loading="lazy">`).join("")}</div>` : `<p class="muted">No photos yet.</p>`}
+    <p><button class="btn ghost sm" data-act="photo">Add a photo</button></p>
+    <h3 style="margin-top:18px">Visitor ratings${r ? ` <small class="muted" style="font-weight:400">· ${r.n} visit${r.n > 1 ? "s" : ""}</small>` : ""}</h3>
     ${r ? `
       ${CRITERIA.map(cr => { const v = r.per[cr.id], k = v ? Math.round(v) : 0, pos = v ? Math.max(0, Math.min(100, (v - 1) * 50)) : 0;
         return `<div class="meas"><div class="mh"><span>${cr.label}</span>${v ? "" : `<small class="muted">No answers yet</small>`}</div>
@@ -513,9 +516,6 @@ function openSpring(id, push = true) {
       : `<p class="muted">No ratings yet.</p>`}
     <button class="btn" data-act="review">${revs.some(x => x.user === me.id) ? "Update my rating" : "Rate this spring"}</button>
     ${revs.filter(x => x.text).map(x => { const v = norm(x.r || {}); return `<div class="card" style="margin-top:10px"><b>${esc(x.handle)}</b> ${v.worth ? `<span class="tag">${esc(answerWord(CRITERIA.find(c => c.id === "worth"), v.worth))}</span>` : ""}<br>${esc(x.text)}<br><small class="muted">${new Date(x.date).toLocaleDateString("en-GB")}</small></div>`; }).join("")}
-    <h3 style="margin-top:18px">Photos (${phs.length})</h3>
-    ${phs.length ? `<div class="photos">${phs.map((p, i) => `<img src="${p.data}" alt="${esc(p.caption || s.name)}" data-ph="${i}" loading="lazy">`).join("")}</div>` : `<p class="muted">No photos yet.</p>`}
-    <p><button class="btn ghost sm" data-act="photo">Add a photo</button></p>
     <h3 style="margin-top:18px">Check the details</h3>
     <p class="muted">Correct anything that is wrong. A suggestion shows once another visitor confirms it${CONFIG.confirmThreshold < 2 ? " (test build: shows straight away)" : ""}.</p>
     ${eds.map(e => e.field === "position" ? posCard(e) : `<div class="card"><b>${esc(({ name: "Name", temp_c: "Temperature °C", access: "Getting there", cost: "Cost", closed: "Closed or gone" })[e.field] || e.field)}:</b> ${esc(e.value)}<br>
@@ -853,7 +853,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121p").then(r => r.json()), fetch("data/notes.json?v=20261121p").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121q").then(r => r.json()), fetch("data/notes.json?v=20261121q").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
