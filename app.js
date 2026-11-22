@@ -733,7 +733,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json").then(r => r.json()), fetch("data/notes.json").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121b").then(r => r.json()), fetch("data/notes.json?v=20261121b").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
