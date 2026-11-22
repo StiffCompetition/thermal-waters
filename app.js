@@ -580,7 +580,7 @@ function renderAbout() {
     <h2>Businesses</h2>
     <p>Run a spring or a place beside one? Add a free basic listing from the spring's page. Adverts will cost a small monthly fee, announced at launch.</p>
     <h2>Where the data comes from</h2>
-    <p>The starting directory is built from open public-domain and CC0 sources: Wikidata and the NOAA thermal springs list for the United States. Visitors then confirm, correct and extend it. Map tiles are provided by Esri.</p>
+    <p>The starting directory is built from open public-domain and CC0 sources: Wikidata, the NOAA thermal springs list for the United States, and a small editorial set where those are thin (such as Colombia, positions approximate until visitors confirm them). Visitors then confirm, correct and extend it. Map tiles are provided by Esri.</p>
     <div class="note"><b>Test build.</b> Everything you add is saved on your own device only. A shared database comes next, so ratings and photos from everyone appear together.</div>`;
 }
 
