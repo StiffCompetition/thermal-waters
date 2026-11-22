@@ -72,3 +72,9 @@ create policy "admin adds log" on public.moderation_log for insert with check (p
 -- auto_moderate(): see live database (migration moderation_admin_and_auto_remove); scheduled with pg_cron:
 --   select cron.schedule('tw-auto-moderate', '15 8 * * *', 'select public.auto_moderate(3)');
 -- The older report-alert email trigger (items_report_alert -> notify_report()) is switched off.
+
+-- AI checker (n8n "TW - AI Checker", daily 09:00 UTC, Claude Haiku 5.5).
+-- Reads reported posts via ai_pending(secret) and applies verdicts via ai_decide(secret, ...).
+-- Removes clear breaches (logged as removed_by 'ai'); keep/unsure stay for admin.html. Secret lives in public.ai_config.
+-- create table public.ai_config (id int primary key default 1 check (id=1), secret text not null);
+-- create table public.ai_checked (target text, key text, decision text, reason text, checked_at timestamptz default now(), primary key(target,key));
