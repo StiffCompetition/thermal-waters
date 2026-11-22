@@ -149,3 +149,6 @@ details.country .regions{padding:0 14px 12px}
 .tile b i{font-size:14px;font-style:normal;color:var(--muted)}
 .tile em{font-style:normal;font-size:13px;color:var(--muted)}
 .desc{font-size:16px;line-height:1.45;margin:8px 0 12px}
+
+.pills.show span{flex:1;min-width:84px;text-align:center;border:1px solid var(--line);background:#f4f8f9;color:#8aa0a8;border-radius:10px;padding:9px 8px;font-size:14px;font-weight:600}
+.pills.show span.on{background:var(--teal);border-color:var(--teal);color:#fff}
