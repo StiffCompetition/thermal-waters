@@ -30,6 +30,26 @@ const CRITERIA = [
   { id: "worth", label: "Worth the trip", help: "Overall: would you go again?", na: false }
 ];
 
+/* ---------- sample spring: invented, shown only so the rating pages can be seen; never saved to the database ---------- */
+const SAMPLE_ID = "sample-1";
+const sampleSvg = (sky, water, label) => "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="${sky}"/><circle cx="320" cy="60" r="28" fill="#ffe9a8"/><path d="M0 170 L90 110 L170 160 L260 95 L400 175 L400 300 L0 300Z" fill="#7b9a8a"/><ellipse cx="200" cy="225" rx="150" ry="52" fill="#d9d2c3"/><ellipse cx="200" cy="222" rx="132" ry="42" fill="${water}"/><g fill="#fff" opacity=".55"><circle cx="160" cy="205" r="9"/><circle cx="215" cy="198" r="12"/><circle cx="250" cy="214" r="7"/></g><text x="200" y="285" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#16313a">${label}</text></svg>`);
+const SAMPLE = {
+  reviews: [
+    ["Steamy-Sam", { clean: 5, staff: 0, cost: 5, access: 3, worth: 5 }, "Free, quiet and properly hot. A 20 minute walk from the car park."],
+    ["Pool-Pete", { clean: 4, staff: 0, cost: 5, access: 4, worth: 4 }, "Went at sunrise and had it to ourselves."],
+    ["Mia-in-Mud", { clean: 3, staff: 0, cost: 5, access: 3, worth: 4 }, "Bit of algae on the rocks. Take sandals."],
+    ["Tubby-Tom", { clean: 4, staff: 0, cost: 5, access: 5, worth: 5 }, "Bus stops at the end of the lane."],
+    ["Lagoon-Lou", { clean: 5, staff: 0, cost: 4, access: 4, worth: 5 }, "Best soak of the whole trip."],
+    ["Kettle-Kat", { clean: 2, staff: 0, cost: 5, access: 2, worth: 3 }, "Busy at weekends and the path is rough."]
+  ].map(([h, r, t], i) => ({ spring: SAMPLE_ID, user: "sample-u" + i, handle: h, r, text: t, date: "2026-11-0" + (i + 1) + "T10:00:00Z" })),
+  photos: [
+    { kind: "pro", caption: "Dawn over the main pool", data: sampleSvg("#f6c9a0", "#7fd0d6", "Dawn over the main pool"), terms: true },
+    { kind: "snap", caption: "Our towels on the rocks", data: sampleSvg("#bfe3f0", "#5bbcc7", "Our towels on the rocks"), terms: false },
+    { kind: "snap", caption: "Steam on a cold morning", data: sampleSvg("#d6dde2", "#8fd6da", "Steam on a cold morning"), terms: false }
+  ].map((p, i) => Object.assign(p, { spring: SAMPLE_ID, user: "sample-u" + i, handle: ["Steamy-Sam", "Pool-Pete", "Mia-in-Mud"][i], date: "2026-11-0" + (i + 1) + "T10:00:00Z", id: "sample-p" + i })),
+  cats: [3, 3, 3, 2, 3].map((cat, i) => ({ spring: SAMPLE_ID, user: "sample-u" + i, cat }))
+};
+
 const PHOTO_TERMS = "By choosing Professional-style you confirm you took the photo (or hold the rights), you keep your copyright, and you allow Thermal Waters of the World to show it on this site and to use it in the planned Thermal Waters of the World book, with your first name or handle as the credit. Holiday snaps are shown on the site only, as everyday reference. You can remove your photos at any time. (Draft wording for the test build.)";
 
 /* ---------- storage ---------- */
@@ -236,6 +256,9 @@ function applyEdits(s) {
   return o;
 }
 function rebuild() {
+  S.reviews = S.reviews.filter(r => r.spring !== SAMPLE_ID).concat(SAMPLE.reviews);
+  S.photos = S.photos.filter(p => p.spring !== SAMPLE_ID).concat(SAMPLE.photos);
+  S.cats = S.cats.filter(c => c.spring !== SAMPLE_ID).concat(SAMPLE.cats);
   const all = S.springs_base.concat(S.added.map(a => Object.assign({ src: "Community", userAdded: true }, a)));
   S.springs = all.map(applyEdits);
   S.byId = new Map(S.springs.map(s => [s.id, s]));
