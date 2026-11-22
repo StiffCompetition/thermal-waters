@@ -53,7 +53,119 @@ const S = {
   f: { q: "", cats: new Set(), country: "", temp: "", minRating: 0, photos: false, mine: "" },
   view: "map", map: null, cluster: null, layer: "topo", userPos: null
 };
-const save = k => Store.set(k, S[k]);
+/* ---------- shared database (Supabase) ----------
+   Everything visitors add is stored in one shared table, so every visitor sees the same
+   ratings, photos, corrections, listings and added springs. The key below is the public
+   (anon) key: row-level security in supabase/schema.sql decides what anyone may do.
+   If the database cannot be reached the site falls back to this device only. */
+const SHARED = ["reviews", "photos", "edits", "listings", "cats", "added", "lists"];
+const Cloud = {
+  url: "https://fbchngfatwtjwttohhoe.supabase.co",
+  key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZiY2huZ2ZhdHd0and0dG9oaG9lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUzMDE5NjksImV4cCI6MjExMDg3Nzk2OX0.9WJQk4Xb8AVwziD3M6kbww3CNdkES3RzvIk7umgPQGg",
+  on: false, ses: null, mine: {}, q: Promise.resolve(),
+  async token() {
+    let s = this.ses || Store.get("ses", null);
+    const now = Math.floor(Date.now() / 1000);
+    if (s && s.expires_at - 60 > now) { this.ses = s; return s.access_token; }
+    let r;
+    if (s && s.refresh_token) r = await fetch(this.url + "/auth/v1/token?grant_type=refresh_token", { method: "POST", headers: { apikey: this.key, "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: s.refresh_token }) });
+    if (!r || !r.ok) r = await fetch(this.url + "/auth/v1/signup", { method: "POST", headers: { apikey: this.key, "Content-Type": "application/json" }, body: "{}" });
+    if (!r.ok) throw new Error("auth");
+    s = await r.json(); this.ses = s; Store.set("ses", s); return s.access_token;
+  },
+  async call(path, o = {}) {
+    const t = await this.token();
+    const r = await fetch(this.url + path, Object.assign({}, o, { headers: Object.assign({ apikey: this.key, Authorization: "Bearer " + t, "Content-Type": "application/json" }, o.headers || {}) }));
+    if (!r.ok) throw new Error(path + " " + r.status);
+    return r;
+  },
+  uid() { return this.ses.user.id; },
+  /* what this visitor owns, as rows */
+  rows(k) {
+    const me = this.uid(), out = new Map();
+    const put = (kind, id, spring, doc) => out.set(kind + "/" + id, { kind, id, spring, doc });
+    if (k === "reviews") S.reviews.filter(r => r.user === me).forEach(r => put("review", r.spring + "|" + me, r.spring, r));
+    if (k === "photos") S.photos.filter(p => p.user === me && !String(p.data).startsWith("data:")).forEach(p => put("photo", p.id, p.spring, p));
+    if (k === "edits") S.edits.forEach(e => {
+      if (e.user === me) put("edit", e.id, e.spring, Object.assign({}, e, { confirm: [] }));
+      if ((e.confirm || []).includes(me) && e.user !== me) put("confirm", e.id + "|" + me, e.spring, { edit: e.id });
+    });
+    if (k === "listings") S.listings.filter(l => l.user === me).forEach(l => put("listing", l.id, l.spring, l));
+    if (k === "cats") S.cats.filter(c => c.user === me).forEach(c => put("cat", c.spring + "|" + me, c.spring, c));
+    if (k === "added") S.added.filter(a => a.user === me).forEach(a => put("added", a.id, a.id, a));
+    if (k === "lists") ["been", "want"].forEach(w => S.lists[w].forEach(id => put("list", me + "|" + w + "|" + id, id, { kind: w, spring: id })));
+    return out;
+  },
+  kinds: { reviews: ["review"], photos: ["photo"], edits: ["edit", "confirm"], listings: ["listing"], cats: ["cat"], added: ["added"], lists: ["list"] },
+  async uploadPhotos() {
+    const me = this.uid();
+    for (const p of S.photos.filter(p => p.user === me && String(p.data).startsWith("data:"))) {
+      p.id = p.id || uid();
+      const blob = await (await fetch(p.data)).blob();
+      await this.call("/storage/v1/object/photos/" + me + "/" + p.id + ".jpg", { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob });
+      p.data = this.url + "/storage/v1/object/public/photos/" + me + "/" + p.id + ".jpg";
+    }
+  },
+  async sync(k) {
+    if (k === "photos") await this.uploadPhotos();
+    const want = this.rows(k), kinds = this.kinds[k], up = [];
+    want.forEach((row, key) => { const j = JSON.stringify(row.doc); if (this.mine[key] !== j) { up.push(row); this.mine[key] = j; } });
+    const gone = Object.keys(this.mine).filter(key => kinds.includes(key.split("/")[0]) && !want.has(key));
+    if (up.length) await this.call("/rest/v1/items?on_conflict=kind,id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(up) });
+    for (const key of gone) { const i = key.indexOf("/"); await this.call("/rest/v1/items?kind=eq." + key.slice(0, i) + "&id=eq." + encodeURIComponent(key.slice(i + 1)), { method: "DELETE" }); delete this.mine[key]; }
+  },
+  push(k) {
+    this.q = this.q.then(() => this.sync(k)).catch(() => toast("Could not reach the shared database. Try again in a moment."));
+  },
+  async pull() {
+    const me = this.uid(), rows = [];
+    for (let off = 0; ; off += 1000) {
+      const r = await this.call("/rest/v1/items?select=kind,id,spring,user_id,doc&order=created_at.asc&limit=1000&offset=" + off);
+      const part = await r.json(); rows.push(...part); if (part.length < 1000) break;
+    }
+    const n = { reviews: [], photos: [], edits: [], listings: [], cats: [], added: [], lists: { been: [], want: [] } }, conf = {};
+    this.mine = {};
+    rows.forEach(x => {
+      if (x.user_id === me) this.mine[x.kind + "/" + x.id] = JSON.stringify(x.doc);
+      const d = Object.assign({}, x.doc, x.kind === "confirm" || x.kind === "list" ? {} : { user: x.user_id });
+      if (x.kind === "review") n.reviews.push(d);
+      else if (x.kind === "photo") n.photos.push(d);
+      else if (x.kind === "edit") n.edits.push(d);
+      else if (x.kind === "confirm") (conf[x.doc.edit] = conf[x.doc.edit] || []).push(x.user_id);
+      else if (x.kind === "listing") n.listings.push(d);
+      else if (x.kind === "cat") n.cats.push(d);
+      else if (x.kind === "added") n.added.push(d);
+      else if (x.kind === "list" && x.user_id === me) (n.lists[x.doc.kind] || []).push(x.doc.spring);
+    });
+    n.edits.forEach(e => e.confirm = conf[e.id] || []);
+    SHARED.forEach(k => S[k] = n[k]);
+  },
+  async init() {
+    try {
+      await this.token();
+      const me = this.uid(), p = profile();
+      const old = p.id;
+      if (old !== me) {   // first time on the shared database: carry this device's test data over
+        p.id = me; Store.set("profile", p);
+        ["reviews", "photos", "edits", "listings", "cats", "added"].forEach(k => S[k].forEach(x => { if (x.user === old) x.user = me; }));
+        S.edits.forEach(e => e.confirm = (e.confirm || []).map(u => u === old ? me : u));
+      }
+      this.on = true;
+      if (!Store.get("cloud1", false)) { for (const k of SHARED) await this.sync(k); Store.set("cloud1", true); }
+      await this.pull();
+    } catch (e) { this.on = false; console.warn("Shared database unavailable, using this device only", e); }
+  },
+  async eraseMine() {
+    const me = this.uid();
+    const ph = S.photos.filter(p => p.user === me && String(p.data).includes("/photos/" + me + "/")).map(p => me + "/" + p.id + ".jpg");
+    if (ph.length) await this.call("/storage/v1/object/photos", { method: "DELETE", body: JSON.stringify({ prefixes: ph }) });
+    await this.call("/rest/v1/items?user_id=eq." + me, { method: "DELETE" });
+  }
+};
+const save = k => {
+  if (Cloud.on && SHARED.includes(k)) { Cloud.push(k); return true; }
+  return Store.set(k, S[k]);
+};
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -441,17 +553,17 @@ function renderMe() {
   $("#me").innerHTML = `
     <h1>My springs</h1>
     <div class="card"><b>${esc(me.handle)}</b> <span class="tag">Anonymous account</span>
-      <p class="muted">Your account has no name, email or password. In this test build it lives on this device. Pick any handle you like.</p>
+      <p class="muted">Your account has no name, email or password and is kept in this browser. Ratings, photos, corrections and listings you add are shared with everyone. Your lists stay private. Pick any handle you like.</p>
       <div class="row"><input id="hName" value="${esc(me.handle)}" maxlength="24" style="padding:8px;border:1px solid var(--line);border-radius:10px"><button class="btn sm" id="hSave">Change handle</button></div></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
       <div class="card"><h2>Places I have been (${S.lists.been.length})</h2>${S.lists.been.map(row).join("") || `<p class="muted">Nothing yet. Open any spring and press "I have been here".</p>`}</div>
       <div class="card"><h2>Places I want to go (${S.lists.want.length})</h2>${S.lists.want.map(row).join("") || `<p class="muted">Nothing yet. Open any spring and press "I want to go".</p>`}</div>
     </div>
     <div class="card"><h2>My ratings (${myRev.length})</h2>${myRev.map(r => `<div class="item" data-open="${esc(r.spring)}"><div><b>${esc(S.byId.get(r.spring)?.name || r.spring)}</b><small>${stars(r.r.worth)} ${esc(r.text || "")}</small></div></div>`).join("") || `<p class="muted">You have not rated a spring yet.</p>`}</div>
-    <div class="row"><button class="btn ghost sm" id="mExport">Download my data</button><button class="btn warn sm" id="mReset">Erase everything on this device</button></div>`;
+    <div class="row"><button class="btn ghost sm" id="mExport">Download my data</button><button class="btn warn sm" id="mReset">Erase my account and everything I added</button></div>`;
   $("#hSave").onclick = () => { const v = $("#hName").value.trim(); if (v.length < 3) return toast("Handle needs 3 or more characters"); me.handle = v; Store.set("profile", me); S.reviews.filter(r => r.user === me.id).forEach(r => r.handle = v); save("reviews"); renderMe(); toast("Handle changed"); };
   $("#mExport").onclick = () => { const blob = new Blob([JSON.stringify({ profile: me, lists: S.lists, reviews: myRev, added: S.added, edits: S.edits }, null, 1)], { type: "application/json" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "my-thermal-waters.json"; a.click(); };
-  $("#mReset").onclick = () => { if (confirm("Erase your account, lists, ratings and photos from this device?")) { Object.keys(localStorage).filter(k => k.startsWith("tw_")).forEach(k => localStorage.removeItem(k)); location.hash = "#map"; location.reload(); } };
+  $("#mReset").onclick = async () => { if (confirm("Erase your account, lists, ratings and photos?")) { if (Cloud.on) { try { await Cloud.eraseMine(); } catch (e) { return toast("Could not erase from the shared database. Try again."); } } Object.keys(localStorage).filter(k => k.startsWith("tw_")).forEach(k => localStorage.removeItem(k)); location.hash = "#map"; location.reload(); } };
 }
 
 /* ---------- about ---------- */
@@ -517,6 +629,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
     const [a, b] = await Promise.all([fetch("data/springs.json").then(r => r.json()), fetch("data/notes.json").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
+  await Cloud.init();
   rebuild(); initMap(); initSearch();
   $("#sortSel").onchange = renderList;
   refreshMarkers(); route(); window.addEventListener("hashchange", route);
