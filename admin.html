@@ -69,7 +69,7 @@ async function load() {
   groups.sort((a, b) => b.n - a.n);
   const log = await api("/rest/v1/moderation_log?select=*&order=removed_at.desc&limit=30");
   const live = groups.filter(g => g.target);
-  app.innerHTML = `<p class="muted">Signed in. Posts with ${HIDE} different reporters are removed automatically every hour.</p>
+  app.innerHTML = `<p class="muted">Signed in. Posts with ${HIDE} different reporters are removed automatically once a day.</p>
   <div class="big">Waiting (${live.length})</div>
   ${live.length ? live.map((g, i) => `<div class="card"><b>${label[g.tk] || g.tk}</b> on <a href="index.html#spring=${encodeURIComponent(g.spring)}" target="_blank">${esc(g.spring)}</a> &middot; ${g.n} of ${HIDE} reports
     ${g.tk === "photo" && g.target.doc.data ? `<p><img src="${esc(g.target.doc.data)}"></p>` : `<p>${esc(summary(g.target.doc)) || "<i>(no text)</i>"}</p>`}

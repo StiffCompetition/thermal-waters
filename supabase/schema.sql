@@ -70,5 +70,5 @@ create policy "admin updates log" on public.moderation_log for update using (pub
 create policy "admin adds log" on public.moderation_log for insert with check (public.is_admin());
 
 -- auto_moderate(): see live database (migration moderation_admin_and_auto_remove); scheduled with pg_cron:
---   select cron.schedule('tw-auto-moderate', '15 * * * *', 'select public.auto_moderate(3)');
+--   select cron.schedule('tw-auto-moderate', '15 8 * * *', 'select public.auto_moderate(3)');
 -- The older report-alert email trigger (items_report_alert -> notify_report()) is switched off.
