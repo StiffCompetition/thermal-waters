@@ -27,7 +27,7 @@ const catOf = id => CATS.find(c => c.id === Number(id)) || NOCAT;
 const CRITERIA = [
   { id: "access", label: "Getting there", help: "On foot, public transport or by road", opts: ["Hard trek", "Doable", "Walk up"] },
   { id: "facil", label: "Facilities", help: "Changing rooms, toilets, showers, staff", opts: ["None", "Basics", "Full"] },
-  { id: "clean", label: "Cleanliness", help: "The site: litter, changing areas, banks", opts: ["Grubby", "Fine", "Spotless"] },
+  { id: "clean", label: "Cleanliness", help: "The site: litter, changing areas, banks", opts: ["Dirty", "Passable", "Spotless"] },
   { id: "worth", label: "Worth the trip", help: "Would you go again?", opts: ["Never again", "Maybe", "Definitely"] }
 ];
 /* Descriptors: shown and searchable, never scored */
@@ -776,7 +776,7 @@ function renderAbout() {
     <h2>The type scale</h2>
     <div class="catlist">${CATS.map(c => `<div class="card"><b><i class="dot" style="background:${c.color};margin:0"></i>${c.id}. ${esc(c.name)}</b><span class="muted">${esc(c.line)}</span></div>`).join("")}</div>
     <h2>How rating works</h2>
-    <p>Visitors answer four questions, each with three named answers: <b>Getting there</b> (Hard trek, Doable, Walk up), <b>Facilities</b> (None, Basics, Full), <b>Cleanliness</b> (Grubby, Fine, Spotless) and <b>Worth the trip</b> (Never again, Maybe, Definitely). The answers average into the score out of 10 shown on every spring.</p>
+    <p>Visitors answer four questions, each with three named answers: <b>Getting there</b> (Hard trek, Doable, Walk up), <b>Facilities</b> (None, Basics, Full), <b>Cleanliness</b> (Dirty, Passable, Spotless) and <b>Worth the trip</b> (Never again, Maybe, Definitely). The answers average into the score out of 10 shown on every spring.</p>
     <p>The type above is worked out from the Getting there and Facilities answers, so nobody votes on it separately. Water look (Clear, Milky blue, Cloudy, Muddy), water kind (Sulphur, Iron-rich, Salty, Fizzy, Plain mineral) the entry price (typed in the local currency, or Free) and how you pay (Cash only, Card, QR or bank transfer, Pay in advance online) are shown and searchable but never scored.</p>
     <h2>Photos</h2>
     <p>Add holiday snaps for everyone to see. If you shoot professional-style pictures, you can agree to let them appear in the planned Thermal Waters of the World book.</p>
@@ -851,7 +851,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121m").then(r => r.json()), fetch("data/notes.json?v=20261121m").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121n").then(r => r.json()), fetch("data/notes.json?v=20261121n").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
