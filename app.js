@@ -504,9 +504,10 @@ function openSpring(id, push = true) {
     ${s.accessNote ? `<p><b>Getting there:</b> ${esc(s.accessNote)}</p>` : ""}${s.costNote ? `<p><b>Cost:</b> ${esc(s.costNote)}</p>` : ""}
     <h3>Visitor score</h3>
     ${r ? `<p><span class="bigscore">${r.overall.toFixed(1)}</span><span class="muted"> out of 10 from ${r.n} visit${r.n > 1 ? "s" : ""}</span></p>
-      ${CRITERIA.map(cr => { const v = r.per[cr.id], k = v ? Math.round(v) : 0;
+      ${CRITERIA.map(cr => { const v = r.per[cr.id], k = v ? Math.round(v) : 0, pos = v ? Math.max(0, Math.min(100, (v - 1) * 50)) : 0;
         return `<div class="meas"><div class="mh"><span>${cr.label}</span>${v ? "" : `<small class="muted">No answers yet</small>`}</div>
-        <div class="pills show">${cr.opts.map((o, i) => `<span class="${i + 1 === k ? "on" : ""}">${esc(o)}</span>`).join("")}</div></div>`; }).join("")}`
+        <div class="track"><b></b><u style="left:0"></u><u style="left:50%"></u><u style="left:100%"></u>${v ? `<svg class="drop" style="left:${pos}%" viewBox="0 0 24 30" aria-hidden="true"><path d="M12 1C12 1 2 12.5 2 19a10 10 0 0 0 20 0C22 12.5 12 1 12 1z" fill="#0e7c86" stroke="#fff" stroke-width="2"/><path d="M8 19a4 4 0 0 0 4 4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/></svg>` : ""}</div>
+        <div class="segl">${cr.opts.map((o, i) => `<span class="${i + 1 === k ? "on" : ""}">${esc(o)}</span>`).join("")}</div></div>`; }).join("")}`
       : `<p class="muted">No ratings yet.</p>`}
     <button class="btn" data-act="review">${revs.some(x => x.user === me.id) ? "Update my rating" : "Rate this spring"}</button>
     ${revs.filter(x => x.text).map(x => { const v = norm(x.r || {}); return `<div class="card" style="margin-top:10px"><b>${esc(x.handle)}</b> ${v.worth ? `<span class="tag">${esc(answerWord(CRITERIA.find(c => c.id === "worth"), v.worth))}</span>` : ""}<br>${esc(x.text)}<br><small class="muted">${new Date(x.date).toLocaleDateString("en-GB")}</small></div>`; }).join("")}
@@ -850,7 +851,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet()
 (async function start() {
   profile();
   try {
-    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121h").then(r => r.json()), fetch("data/notes.json?v=20261121h").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+    const [a, b] = await Promise.all([fetch("data/springs.json?v=20261121i").then(r => r.json()), fetch("data/notes.json?v=20261121i").then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
     S.springs_base = a; S.notes = b || {};
   } catch (e) { S.springs_base = []; document.body.insertAdjacentHTML("afterbegin", `<div class="note">The spring data could not be loaded. Please refresh.</div>`); }
   await Cloud.init();
