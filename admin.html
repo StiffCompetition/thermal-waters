@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Moderation - Thermal Waters</title>
+<link rel="stylesheet" href="style.css?v=20261121w">
+<style>body{padding:16px;max-width:760px;margin:0 auto}.card{border:1px solid var(--line,#ddd);border-radius:12px;padding:12px;margin:12px 0;background:#fff}.card img{max-width:100%;border-radius:8px}.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.muted{color:#667}.big{font-size:20px;margin:18px 0 4px}</style></head>
+<body>
+<h1>Moderation</h1>
+<div id="app"><p class="muted">Loading...</p></div>
+<script>
+const URL_ = "https://fbchngfatwtjwttohhoe.supabase.co";
+const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZiY2huZ2ZhdHd0and0dG9oaG9lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUzMDE5NjksImV4cCI6MjExMDg3Nzk2OX0.9WJQk4Xb8AVwziD3M6kbww3CNdkES3RzvIk7umgPQGg";
+const ADMIN = "andy@stiffcompetitionart.com", HIDE = 3;
+const $ = s => document.querySelector(s), app = $("#app");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let ses = null; try { ses = JSON.parse(localStorage.getItem("tw_admin_ses")); } catch (e) { }
+const save = () => localStorage.setItem("tw_admin_ses", JSON.stringify(ses));
+async function token() {
+  const now = Math.floor(Date.now() / 1000);
+  if (ses && ses.expires_at - 60 > now) return ses.access_token;
+  if (ses && ses.refresh_token) {
+    const r = await fetch(URL_ + "/auth/v1/token?grant_type=refresh_token", { method: "POST", headers: { apikey: KEY, "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: ses.refresh_token }) });
+    if (r.ok) { const j = await r.json(); ses = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at }; save(); return ses.access_token; }
+  }
+  ses = null; localStorage.removeItem("tw_admin_ses"); return null;
+}
+async function api(path, opt = {}) {
+  const t = await token();
+  const r = await fetch(URL_ + path, Object.assign({}, opt, { headers: Object.assign({ apikey: KEY, Authorization: "Bearer " + (t || KEY), "Content-Type": "application/json" }, opt.headers || {}) }));
+  if (!r.ok) throw new Error(path + " " + r.status + " " + await r.text());
+  const x = await r.text(); return x ? JSON.parse(x) : null;
+}
+function fromLink() {
+  if (!/access_token=/.test(location.hash)) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  ses = { access_token: p.get("access_token"), refresh_token: p.get("refresh_token"), expires_at: Math.floor(Date.now() / 1000) + Number(p.get("expires_in") || 3600) };
+  save(); history.replaceState(null, "", location.pathname);
+}
+function signIn(msg) {
+  app.innerHTML = `<p>Sign in with the owner email. A link is sent to it.</p><div class="row"><input id="em" type="email" value="${ADMIN}" style="flex:1;padding:10px"><button class="btn" id="go">Send link</button></div><p class="muted">${esc(msg || "")}</p>`;
+  $("#go").onclick = async () => {
+    const r = await fetch(URL_ + "/auth/v1/otp?redirect_to=" + encodeURIComponent(location.origin + location.pathname), { method: "POST", headers: { apikey: KEY, "Content-Type": "application/json" }, body: JSON.stringify({ email: $("#em").value.trim(), create_user: true }) });
+    signIn(r.ok ? "Link sent. Open it on this device." : "Could not send (" + r.status + "). Wait a minute and try again.");
+  };
+}
+const ago = d => { const m = Math.round((Date.now() - new Date(d)) / 60000); return m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " days ago"; };
+const label = { review: "Rating", photo: "Photo", listing: "Listing", edit: "Correction", added: "Added spring" };
+const summary = d => d ? String(d.text || d.caption || d.name || d.value || d.field || "").slice(0, 300) : "";
+async function cleanFiles() {
+  const pend = await api("/rest/v1/moderation_log?file_pending=eq.true&select=id,file");
+  if (!pend.length) return;
+  await api("/storage/v1/object/photos", { method: "DELETE", body: JSON.stringify({ prefixes: pend.map(p => p.file) }) });
+  for (const p of pend) await api("/rest/v1/moderation_log?id=eq." + p.id, { method: "PATCH", body: JSON.stringify({ file_pending: false }) });
+}
+async function removeTarget(g, by) {
+  const t = g.target;
+  const file = g.tk === "photo" && t && /\/photos\//.test(t.doc.data || "") ? t.doc.data.split("/photos/")[1] : null;
+  if (t) await api("/rest/v1/moderation_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ removed_by: by, kind: t.kind, item_id: t.id, spring: t.spring, user_id: t.user_id, doc: t.doc, reports: g.reports.map(r => r.doc), file, file_pending: !!file }) });
+  if (t) await api("/rest/v1/items?kind=eq." + g.tk + "&id=eq." + encodeURIComponent(g.tid), { method: "DELETE" });
+  await dismiss(g);
+  await cleanFiles();
+}
+async function dismiss(g) { for (const r of g.reports) await api("/rest/v1/items?kind=eq.report&id=eq." + encodeURIComponent(r.id), { method: "DELETE" }); }
+async function load() {
+  const reps = await api("/rest/v1/items?kind=eq.report&select=id,spring,user_id,doc,created_at");
+  const by = new Map();
+  reps.forEach(r => { const k = r.doc.target + "|" + r.doc.key; if (!by.has(k)) by.set(k, { tk: r.doc.target, tid: r.doc.key, spring: r.spring, reports: [] }); by.get(k).reports.push(r); });
+  const groups = [...by.values()];
+  for (const g of groups) { const x = await api("/rest/v1/items?kind=eq." + g.tk + "&id=eq." + encodeURIComponent(g.tid) + "&select=kind,id,spring,user_id,doc"); g.target = x[0] || null; g.n = new Set(g.reports.map(r => r.user_id)).size; }
+  groups.sort((a, b) => b.n - a.n);
+  const log = await api("/rest/v1/moderation_log?select=*&order=removed_at.desc&limit=30");
+  const live = groups.filter(g => g.target);
+  app.innerHTML = `<p class="muted">Signed in. Posts with ${HIDE} different reporters are removed automatically every hour.</p>
+  <div class="big">Waiting (${live.length})</div>
+  ${live.length ? live.map((g, i) => `<div class="card"><b>${label[g.tk] || g.tk}</b> on <a href="index.html#spring=${encodeURIComponent(g.spring)}" target="_blank">${esc(g.spring)}</a> &middot; ${g.n} of ${HIDE} reports
+    ${g.tk === "photo" && g.target.doc.data ? `<p><img src="${esc(g.target.doc.data)}"></p>` : `<p>${esc(summary(g.target.doc)) || "<i>(no text)</i>"}</p>`}
+    <p class="muted">Reasons: ${esc([...new Set(g.reports.map(r => r.doc.reason))].join(", "))}</p>
+    <div class="row"><button class="btn" data-rm="${i}">Remove</button><button class="btn ghost" data-keep="${i}">Keep</button></div></div>`).join("") : `<p class="muted">Nothing waiting.</p>`}
+  <div class="big">Removed (${log.length})</div>
+  ${log.length ? log.map(l => `<div class="card"><b>${label[l.kind] || l.kind}</b> on ${esc(l.spring)} &middot; ${l.removed_by === "auto" ? "removed automatically" : "removed by you"} ${ago(l.removed_at)}${l.restored ? " &middot; restored" : ""}
+    <p>${l.kind === "photo" ? "<i>(photo)</i>" : esc(summary(l.doc))}</p>
+    <p class="muted">Reasons: ${esc([...new Set((l.reports || []).map(r => r.reason))].join(", "))}</p>
+    ${l.restored || l.kind === "photo" ? "" : `<div class="row"><button class="btn ghost" data-rs="${l.id}">Restore</button></div>`}</div>`).join("") : `<p class="muted">Nothing removed yet.</p>`}`;
+  document.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { b.disabled = true; await removeTarget(live[b.dataset.rm], "admin"); load(); });
+  document.querySelectorAll("[data-keep]").forEach(b => b.onclick = async () => { b.disabled = true; await dismiss(live[b.dataset.keep]); load(); });
+  document.querySelectorAll("[data-rs]").forEach(b => b.onclick = async () => {
+    b.disabled = true; const l = log.find(x => String(x.id) === b.dataset.rs);
+    await api("/rest/v1/items?on_conflict=kind,id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([{ kind: l.kind, id: l.item_id, spring: l.spring, user_id: l.user_id, doc: l.doc }]) });
+    await api("/rest/v1/moderation_log?id=eq." + l.id, { method: "PATCH", body: JSON.stringify({ restored: true }) }); load();
+  });
+}
+(async () => {
+  fromLink();
+  if (!(await token())) return signIn();
+  try {
+    const ok = await api("/rest/v1/rpc/is_admin", { method: "POST", body: "{}" });
+    if (ok !== true) { app.innerHTML = `<p>This page is for the owner only.</p><button class="btn ghost" id="so">Sign out</button>`; $("#so").onclick = () => { localStorage.removeItem("tw_admin_ses"); location.reload(); }; return; }
+    await cleanFiles(); await load();
+  } catch (e) { app.innerHTML = `<p>Something went wrong.</p><pre>${esc(e.message)}</pre>`; }
+})();
+</script></body></html>
