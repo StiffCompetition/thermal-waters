@@ -215,7 +215,7 @@ function rating(id) {
 /* ---------- filters ---------- */
 function passes(s) {
   const f = S.f;
-  if (f.q) { const q = f.q.toLowerCase(); if (!(s.name.toLowerCase().includes(q) || (s.country || "").toLowerCase().includes(q) || (s.region || "").toLowerCase().includes(q))) return false; }
+  if (f.q) { const q = f.q.toLowerCase(); if (!(s.name.toLowerCase().includes(q) || (s.alt || "").toLowerCase().includes(q) || (s.country || "").toLowerCase().includes(q) || (s.region || "").toLowerCase().includes(q))) return false; }
   if (f.cats.size && !f.cats.has(s.cat || 0)) return false;
   if (f.country && s.country !== f.country) return false;
   if (f.temp) { const t = tempClass(s.temp_c); if (t !== f.temp) return false; }
@@ -339,7 +339,7 @@ function openSpring(id, push = true) {
     ["Position", s.lat.toFixed(4) + ", " + s.lon.toFixed(4)]
   ];
   const html = `
-    <h2 style="margin-bottom:4px">${esc(s.name)}</h2>
+    <h2 style="margin-bottom:4px">${esc(s.name)}</h2>${s.alt ? `<p class="muted" style="margin:0 0 6px">${esc(s.alt)}</p>` : ""}
     <div class="row"><span class="chip"><i style="background:${c.color}"></i>${esc(c.name)}</span>
       ${s.closed ? `<span class="tag">Reported closed</span>` : ""}${s.userAdded ? `<span class="tag">Added by a visitor</span>` : ""}<span class="tag">Source: ${esc(s.src)}</span></div>
     <p class="muted" style="margin:6px 0">${esc(c.line)}</p>
@@ -589,7 +589,7 @@ function initSearch() {
   const q = $("#q"), box = $("#suggest");
   q.addEventListener("input", () => {
     const v = q.value.trim().toLowerCase(); S.f.q = ""; if (v.length < 2) { box.hidden = true; return; }
-    const hits = []; for (const s of S.springs) { if (s.name.toLowerCase().includes(v) || (s.country || "").toLowerCase().startsWith(v)) { hits.push(s); if (hits.length >= 8) break; } }
+    const hits = []; for (const s of S.springs) { if (s.name.toLowerCase().includes(v) || (s.alt || "").toLowerCase().includes(v) || (s.country || "").toLowerCase().startsWith(v)) { hits.push(s); if (hits.length >= 8) break; } }
     const countries = Array.from(new Set(S.springs.map(s => s.country).filter(c => c && c.toLowerCase().startsWith(v)))).slice(0, 3);
     box.innerHTML = countries.map(c => `<button data-country="${esc(c)}"><b>${esc(c)}</b><br><small>Show every spring in this country</small></button>`).join("") +
       hits.map(s => `<button data-open="${esc(s.id)}"><b>${esc(s.name)}</b><br><small>${esc([s.region, s.country].filter(Boolean).join(", "))}</small></button>`).join("") || `<div style="padding:12px" class="muted">No match yet</div>`;
